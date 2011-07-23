@@ -4,7 +4,7 @@
  Plugin URI: http://iscw.jp/wp/
  Description: コメント内に日本語の記述が一つも存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社アイ・エス・シー　さとう　たけし
- Version: 1.1
+ Version: 1.2
  Author URI: http://iscw.jp/
  */
 
