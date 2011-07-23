@@ -4,12 +4,12 @@
  Plugin URI: http://iscw.jp/wp/
  Description: コメント内に日本語の記述が一つも存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社アイ・エス・シー　さとう　たけし
- Version: 1.2
+ Version: 1.2.1
  Author URI: http://iscw.jp/
  */
 
 class ThrowsSpamAway {
-	var $version = '1.0';
+	var $version = '1.2.1';
 	function ThrowsSpamAway() {
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
 	}
