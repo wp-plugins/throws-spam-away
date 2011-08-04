@@ -4,7 +4,7 @@ Donate link: http://iscw.jp/
 Tags: comments, spam
 Requires at least: 3.1
 Tested up to: 3.2.1
-Stable tag: 1.2.1
+Stable tag: 1.3
 
 コメント内に日本語文字列が一つも存在しない場合あたかも受け付けたように振る舞いながらも無視
 
@@ -30,6 +30,9 @@ e.g.
 == Screenshots ==
 
 == Changelog ==
+= 1.3 =
+コメント欄下の注意文言及びエラー文言を設定可能にしました。
+
 = 1.2.1 =
 バージョン表記修正。機能は変更ありません。
 
@@ -44,6 +47,9 @@ e.g.
 新規作成
 
 == Upgrade Notice ==
+= 1.3 =
+コメント欄下の注意文言及びエラー文言を設定可能にしました。
+
 = 1.2.1 =
 バージョン表記修正
 

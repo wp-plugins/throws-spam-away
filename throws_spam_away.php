@@ -4,20 +4,28 @@
  Plugin URI: http://iscw.jp/wp/
  Description: コメント内に日本語の記述が一つも存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社アイ・エス・シー　さとう　たけし
- Version: 1.2.1
+ Version: 1.3
  Author URI: http://iscw.jp/
  */
 
 class ThrowsSpamAway {
-	var $version = '1.2.1';
+	// version
+	var $version = '1.3';
+	// コメント欄下に表示される注意文言（初期設定）
+	var $default_caution_msg = '日本語が含まれない投稿は無視されますのでご注意ください。（スパム対策）';
+	// エラー時に表示されるエラー文言（初期設定）
+	var $default_error_msg = '日本語を規定文字数以上含まない記事は投稿できませんよ。';
+	
 	function ThrowsSpamAway() {
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
 	}
 
 	function comment_form() {
+		global $default_caution_msg;
 		// 注意文言表示
+		$caution_msg = get_option('tsa_caution_message');
 		echo '<div id="throwsSpamAway">';
-		echo '日本語が含まれない投稿は無視されますのでご注意ください。（スパム対策）';
+		echo ($caution_msg != null? $caution_msg : $default_caution_msg);
 		echo '</div>';
 		return true;
 	}
@@ -25,6 +33,7 @@ class ThrowsSpamAway {
 	function comment_post($id) {
 		global $newThrowsSpamAway;
 		global $user_ID;
+		global $default_error_msg;
 
 		if( $user_ID ) {
 			return $id;
@@ -34,7 +43,8 @@ class ThrowsSpamAway {
 		if ($newThrowsSpamAway->validation($comment)) {
 			return $id;
 		}
-		wp_die( __('日本語を規定文字数以上含まない記事は投稿できませんよ。<script type="text/javascript">window.setTimeout(location.href = "'.$_SERVER['HTTP_REFERER'].'", '.(get_option('back_content_second')!=null?get_option('back_content_second'):10).');</script>', 'throws-spam-away'));
+		$error_msg = get_option('tsa_error_message');
+		wp_die( __(($error_msg != null? $error_msg : $default_error_msg).'<script type="text/javascript">window.setTimeout(location.href = "'.$_SERVER['HTTP_REFERER'].'", '.(get_option('tsa_back_content_second')!=null?get_option('tsa_back_content_second'):10).');</script>', 'throws-spam-away'));
 	}
 
 	/**
@@ -80,6 +90,8 @@ class ThrowsSpamAway {
 	 * Admin options page
 	 */
 	function options_page() {
+		global $default_caution_msg;
+		global $default_error_msg;
 ?>
 <div class="wrap">
 	<h2>Throws SPAM Away. Setting</h2>
@@ -93,10 +105,18 @@ class ThrowsSpamAway {
 	<tr valign="top">
 		<th scope="row">元の記事に戻ってくる時間<br />（ミリ秒）</th>
 		<td><input type="text" name="tsa_back_content_second" value="<?php echo get_option('tsa_back_content_second');?>" /></td>
-	</tr>	
+	</tr>
+	<tr valign="top">
+		<th scope="row">コメント欄の下に表示される注意文言</th>
+		<td><input type="text" name="tsa_caution_message" size="50" value="<?php echo (get_option('tsa_caution_message') != null? get_option('tsa_caution_message') : $default_caution_msg);?>" /></td>
+	</tr>
+	<tr valign="top">
+		<th scope="row">エラー時に表示される文言<br />（元の記事に戻ってくる時間の間のみ表示）</th>
+		<td><input type="text" name="tsa_error_message" size="50" value="<?php echo (get_option('tsa_error_message') != null? get_option('tsa_error_message') : $default_error_msg);?>" /></td>
+	</tr>
 </table>
 <input type="hidden" name="action" value="update" />
-<input type="hidden" name="page_options" value="tsa_japanese_string_min_count,tsa_back_content_second" />
+<input type="hidden" name="page_options" value="tsa_japanese_string_min_count,tsa_back_content_second,tsa_caution_message,tsa_error_message" />
 <p class="submit">
 		<input type="submit" class="button-primary" value="<?php _e('Save Changes') ?>" />
 </p>
@@ -109,5 +129,5 @@ class ThrowsSpamAway {
 
 $newThrowsSpamAway = new ThrowsSpamAway;
 add_action('comment_form', array(&$newThrowsSpamAway, "comment_form"), 9999);
-add_action('pre_comment_on_post', array(&$newThrowsSpamAway, "comment_post"), 9999);
+add_action('pre_comment_on_post', array(&$newThrowsSpamAway, "comment_post"), 1);
 ?>
