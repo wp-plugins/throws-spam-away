@@ -11,10 +11,6 @@
 class ThrowsSpamAway {
 	// version
 	var $version = '1.3';
-	// コメント欄下に表示される注意文言（初期設定）
-	var $default_caution_msg = '日本語が含まれない投稿は無視されますのでご注意ください。（スパム対策）';
-	// エラー時に表示されるエラー文言（初期設定）
-	var $default_error_msg = '日本語を規定文字数以上含まない記事は投稿できませんよ。';
 	
 	function ThrowsSpamAway() {
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
@@ -108,11 +104,11 @@ class ThrowsSpamAway {
 	</tr>
 	<tr valign="top">
 		<th scope="row">コメント欄の下に表示される注意文言</th>
-		<td><input type="text" name="tsa_caution_message" size="50" value="<?php echo (get_option('tsa_caution_message') != null? get_option('tsa_caution_message') : $default_caution_msg);?>" /></td>
+		<td><input type="text" name="tsa_caution_message" size="50" value="<?php echo get_option('tsa_caution_message');?>" /><br />（初期設定:<?php echo $default_caution_msg;?>）</td>
 	</tr>
 	<tr valign="top">
 		<th scope="row">エラー時に表示される文言<br />（元の記事に戻ってくる時間の間のみ表示）</th>
-		<td><input type="text" name="tsa_error_message" size="50" value="<?php echo (get_option('tsa_error_message') != null? get_option('tsa_error_message') : $default_error_msg);?>" /></td>
+		<td><input type="text" name="tsa_error_message" size="50" value="<?php echo get_option('tsa_error_message');?>" /><br />（初期設定:<?php echo $default_error_msg;?>）</td>
 	</tr>
 </table>
 <input type="hidden" name="action" value="update" />
@@ -126,6 +122,10 @@ class ThrowsSpamAway {
 <?php
 	}
 }
+// コメント欄下に表示される注意文言（初期設定）
+$default_caution_msg = '日本語が含まれない投稿は無視されますのでご注意ください。（スパム対策）';
+// エラー時に表示されるエラー文言（初期設定）
+$default_error_msg = '日本語を規定文字数以上含まない記事は投稿できませんよ。';
 
 $newThrowsSpamAway = new ThrowsSpamAway;
 add_action('comment_form', array(&$newThrowsSpamAway, "comment_form"), 9999);
