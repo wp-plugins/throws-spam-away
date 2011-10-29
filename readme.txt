@@ -23,6 +23,8 @@ Stable tag: 1.4
 日本語が一切入っていないコメントでも「NGキーワード」だけ設定したい場合を想定し
 日本語が入っていないと許可しない設定を「オン・オフ」出来るようになっています。
 
+制作：TAMAN <a href="http://iscw.jp/" target="_blank">ホームページ制作 池袋</a> 株式会社アイ・エス・シー所属
+
 == Installation ==
 
 This section describes how to install the plugin and get it working.
