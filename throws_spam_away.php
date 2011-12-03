@@ -4,14 +4,14 @@
  Plugin URI: http://iscw.jp/wp/
  Description: コメント内に日本語の記述が一つも存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社アイ・エス・シー　さとう　たけし
- Version: 1.4
+ Version: 1.4.1
  Author URI: http://iscw.jp/
  */
 
 class ThrowsSpamAway {
 	// version
-	var $version = '1.4';
-	
+	var $version = '1.4.1';
+
 	function ThrowsSpamAway() {
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
 	}
@@ -43,9 +43,9 @@ class ThrowsSpamAway {
 		}
 		$error_msg = (
 			$error_type != "ng_word" ? (
-				get_option('tsa_error_message') != null ? 
-					get_option('tsa_error_message') : $default_error_msg) : 
-				(get_option('tsa_ng_key_error_message') != null ? 
+				get_option('tsa_error_message') != null ?
+					get_option('tsa_error_message') : $default_error_msg) :
+				(get_option('tsa_ng_key_error_message') != null ?
 					get_option('tsa_ng_key_error_message') : $default_ng_key_error_msg));
 		wp_die( __(($error_msg != null? $error_msg : $default_error_msg).'<script type="text/javascript">window.setTimeout(location.href = "'.$_SERVER['HTTP_REFERER'].'", '.(get_option('tsa_back_content_second')!=null?get_option('tsa_back_content_second'):10).');</script>', 'throws-spam-away'));
 	}
@@ -81,14 +81,17 @@ class ThrowsSpamAway {
 			}
 			// 日本語文字列チェック抜けたらキーワードチェックを行う
 			// キーワード文字列群
-			$keyword_list = mb_split(",", get_option('tsa_ng_keywords'));
-			foreach ($keyword_list as $key) {
-				if (preg_match('/'.trim($key)."/u", $comment)) {
-					$error_type = "ng_word";
-					return FALSE;
+			$ng_keywords = get_option('tsa_ng_keywords');
+			if ($ng_keywords != null && $ng_keywords != "") {
+				$keyword_list = mb_split(",", $ng_keywords);
+				foreach ($keyword_list as $key) {
+					if (preg_match('/'.trim($key)."/u", $comment)) {
+						$error_type = "ng_word";
+						return FALSE;
+					}
 				}
 			}
-			return TRUE;
+				return TRUE;
 		}
 	}
 
@@ -122,7 +125,7 @@ class ThrowsSpamAway {
 		<table class="form-table">
 			<tr valign="top">
 				<th scope="row">日本語が存在しない場合、無視対象とする<br />（日本語文字列が存在しない場合無視対象となります。）</th>
-				<td><?php 
+				<td><?php
 				$chk_1 = "";
 				$chk_2 = "";
 				if (get_option('tsa_on_flg') == "2") {
@@ -166,10 +169,25 @@ class ThrowsSpamAway {
 				<td><input type="text" name="tsa_ng_key_error_message" size="100"
 					value="<?php echo get_option('tsa_ng_key_error_message');?>" /><br />（初期設定:<?php echo $default_ng_key_error_msg;?>）</td>
 			</tr>
+			<tr valign="top">
+				<th scope="row">上記設定をトラックバック記事にも採用する</th>
+				<td><?php
+				$chk_1 = "";
+				$chk_2 = "";
+				if (get_option('tsa_tb_on_flg') == "2") {
+					$chk_2 = " checked=\"checked\"";
+				} else {
+					$chk_1 = " checked=\"checked\"";
+				}
+				 ?>
+				 <label><input type="radio" name="tsa_tb_on_flg"	value="1"<?php echo $chk_1;?>/>&nbsp;する</label>&nbsp;
+				 <label><input type="radio" name="tsa_tb_on_flg" value="2"<?php echo $chk_2;?>/>&nbsp;しない</label>
+				</td>
+			</tr>
 		</table>
 		<input type="hidden" name="action" value="update" /> <input
 			type="hidden" name="page_options"
-			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_content_second,tsa_caution_message,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message" />
+			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_content_second,tsa_caution_message,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_tb_on_flg" />
 		<p class="submit">
 			<input type="submit" class="button-primary"
 				value="<?php _e('Save Changes') ?>" />
@@ -178,6 +196,34 @@ class ThrowsSpamAway {
 	<div class="clear"></div>
 </div>
 	<?php
+	}
+
+	function trackback_spam_away($tb) {
+		global $newThrowsSpamAway;
+
+		$tsa_tb_on_flg = get_option('tsa_tb_on_flg');
+		// トラックバック OR ピンバック時にフィルタ発動
+		if ($tsa_tb_on_flg == "2" || ($tb['comment_type'] != 'trackback' && $tb['comment_type'] != 'pingback')) return $tb;
+
+		// SPAMかどうかフラグ
+		$tb_val['is_spam'] = false;
+
+		// コメント以外には判定しない（タイトルのみ日本語？ありえん・・・という仕様です。）
+		$comment = htmlspecialchars($tb['comment_text']);
+		// 検査します！
+		if (!$tb_val['is_spam'] && $newThrowsSpamAway->validation($comment)) {
+			$tb_val['is_spam'] = true;
+		}
+
+		// トラックバックスパムがなければ返却・あったら捨てちゃう
+		if ( !$tb_val['is_spam'] ) {
+			// トラックバック内に日本語存在（または禁止語句混入なし）
+			return $tb;
+		} else {
+			add_filter('pre_comment_approved', create_function('$a', 'return \'spam\';'));
+			return $tb;
+//			die('Your Trackback Throws Away.');
+		}
 	}
 }
 // エラー種別
@@ -190,6 +236,9 @@ $default_error_msg = '日本語を規定文字数以上含まない記事は投�
 $default_ng_key_error_msg = 'NGキーワードが含まれているため投稿できません。';
 
 $newThrowsSpamAway = new ThrowsSpamAway;
+// トラックバックチェックフィルター
+//add_filter('preprocess_comment', array(&$newThrowsSpamAway, 'trackback_spam_away'), 1, 1);
+// コメントフォーム表示
 add_action('comment_form', array(&$newThrowsSpamAway, "comment_form"), 9999);
 add_action('pre_comment_on_post', array(&$newThrowsSpamAway, "comment_post"), 1);
 ?>
