@@ -4,7 +4,7 @@ Donate link: http://iscw.jp/
 Tags: comments, spam
 Requires at least: 3.1
 Tested up to: 3.3b
-Stable tag: 1.4.1
+Stable tag: 1.4.2
 
 コメント内に日本語文字列が一つも存在しない場合あたかも受け付けたように振る舞いながらも無視
 
@@ -44,6 +44,9 @@ e.g.
 == Screenshots ==
 
 == Changelog ==
+= 1.4.2 =
+バグ修正
+
 = 1.4.1 =
 バグ修正
 

@@ -4,13 +4,38 @@
  Plugin URI: http://iscw.jp/wp/
  Description: コメント内に日本語の記述が一つも存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社アイ・エス・シー　さとう　たけし
- Version: 1.4.1
+ Version: 1.4.2
  Author URI: http://iscw.jp/
  */
 
+/** 初期設定 */
+// エラー種別
+$error_type = "";
+// コメント欄下に表示される注意文言（初期設定）
+$default_caution_msg = '日本語が含まれない投稿は無視されますのでご注意ください。（スパム対策）';
+// エラー時に表示されるエラー文言（初期設定）
+$default_error_msg = '日本語を規定文字数以上含まない記事は投稿できませんよ。';
+// キーワードNGエラー時に表示されるエラー文言（初期設定）
+$default_ng_key_error_msg = 'NGキーワードが含まれているため投稿できません。';
+
+/** プロセス */
+$newThrowsSpamAway = new ThrowsSpamAway;
+// トラックバックチェックフィルター
+//add_filter('preprocess_comment', array(&$newThrowsSpamAway, 'trackback_spam_away'), 1, 1);
+// コメントフォーム表示
+add_action('comment_form', array(&$newThrowsSpamAway, "comment_form"), 9999);
+add_action('pre_comment_on_post', array(&$newThrowsSpamAway, "comment_post"), 1);
+
+/**
+ *
+ * <p>ThrowsSpamAway</p>
+ * WordPress's Plugin
+ * @author TAMAN
+ *
+ */
 class ThrowsSpamAway {
 	// version
-	var $version = '1.4.1';
+	var $version = '1.4.2';
 
 	function ThrowsSpamAway() {
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
@@ -169,6 +194,7 @@ class ThrowsSpamAway {
 				<td><input type="text" name="tsa_ng_key_error_message" size="100"
 					value="<?php echo get_option('tsa_ng_key_error_message');?>" /><br />（初期設定:<?php echo $default_ng_key_error_msg;?>）</td>
 			</tr>
+<?php /**-- 鋭意開発中・・・
 			<tr valign="top">
 				<th scope="row">上記設定をトラックバック記事にも採用する</th>
 				<td><?php
@@ -184,6 +210,7 @@ class ThrowsSpamAway {
 				 <label><input type="radio" name="tsa_tb_on_flg" value="2"<?php echo $chk_2;?>/>&nbsp;しない</label>
 				</td>
 			</tr>
+*/ ?>
 		</table>
 		<input type="hidden" name="action" value="update" /> <input
 			type="hidden" name="page_options"
@@ -226,19 +253,4 @@ class ThrowsSpamAway {
 		}
 	}
 }
-// エラー種別
-$error_type = "";
-// コメント欄下に表示される注意文言（初期設定）
-$default_caution_msg = '日本語が含まれない投稿は無視されますのでご注意ください。（スパム対策）';
-// エラー時に表示されるエラー文言（初期設定）
-$default_error_msg = '日本語を規定文字数以上含まない記事は投稿できませんよ。';
-// キーワードNGエラー時に表示されるエラー文言（初期設定）
-$default_ng_key_error_msg = 'NGキーワードが含まれているため投稿できません。';
-
-$newThrowsSpamAway = new ThrowsSpamAway;
-// トラックバックチェックフィルター
-//add_filter('preprocess_comment', array(&$newThrowsSpamAway, 'trackback_spam_away'), 1, 1);
-// コメントフォーム表示
-add_action('comment_form', array(&$newThrowsSpamAway, "comment_form"), 9999);
-add_action('pre_comment_on_post', array(&$newThrowsSpamAway, "comment_post"), 1);
 ?>
