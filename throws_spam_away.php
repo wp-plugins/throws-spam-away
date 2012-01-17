@@ -4,7 +4,7 @@
  Plugin URI: http://iscw.jp/wp/
  Description: コメント内に日本語の記述が一つも存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社アイ・エス・シー　さとう　たけし
- Version: 1.4.2
+ Version: 1.5
  Author URI: http://iscw.jp/
  */
 
@@ -21,7 +21,7 @@ $default_ng_key_error_msg = 'NGキーワードが含まれているため投稿�
 /** プロセス */
 $newThrowsSpamAway = new ThrowsSpamAway;
 // トラックバックチェックフィルター
-//add_filter('preprocess_comment', array(&$newThrowsSpamAway, 'trackback_spam_away'), 1, 1);
+add_filter('preprocess_comment', array(&$newThrowsSpamAway, 'trackback_spam_away'), 1, 1);
 // コメントフォーム表示
 add_action('comment_form', array(&$newThrowsSpamAway, "comment_form"), 9999);
 add_action('pre_comment_on_post', array(&$newThrowsSpamAway, "comment_post"), 1);
@@ -194,13 +194,12 @@ class ThrowsSpamAway {
 				<td><input type="text" name="tsa_ng_key_error_message" size="100"
 					value="<?php echo get_option('tsa_ng_key_error_message');?>" /><br />（初期設定:<?php echo $default_ng_key_error_msg;?>）</td>
 			</tr>
-<?php /**-- 鋭意開発中・・・
 			<tr valign="top">
 				<th scope="row">上記設定をトラックバック記事にも採用する</th>
 				<td><?php
 				$chk_1 = "";
 				$chk_2 = "";
-				if (get_option('tsa_tb_on_flg') == "2") {
+				if (get_option('tsa_tb_on_flg', "2") == "2") {
 					$chk_2 = " checked=\"checked\"";
 				} else {
 					$chk_1 = " checked=\"checked\"";
@@ -210,11 +209,25 @@ class ThrowsSpamAway {
 				 <label><input type="radio" name="tsa_tb_on_flg" value="2"<?php echo $chk_2;?>/>&nbsp;しない</label>
 				</td>
 			</tr>
-*/ ?>
+			<tr valign="top">
+				<th scope="row">トラックバック記事にも採用する場合、ついでにこちらのURLが含まれているか判断する<br />（初期設定:「しない」）</th>
+				<td><?php
+				$chk_1 = "";
+				$chk_2 = "";
+				if (get_option('tsa_tb_url_flg', "2") == "2") {
+					$chk_2 = " checked=\"checked\"";
+				} else {
+					$chk_1 = " checked=\"checked\"";
+				}
+				 ?>
+				 <label><input type="radio" name="tsa_tb_url_flg"	value="1"<?php echo $chk_1;?>/>&nbsp;する</label>&nbsp;
+				 <label><input type="radio" name="tsa_tb_url_flg" value="2"<?php echo $chk_2;?>/>&nbsp;しない</label>
+				</td>
+			</tr>
 		</table>
 		<input type="hidden" name="action" value="update" /> <input
 			type="hidden" name="page_options"
-			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_content_second,tsa_caution_message,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_tb_on_flg" />
+			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_content_second,tsa_caution_message,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_tb_on_flg,tsa_tb_url_flg" />
 		<p class="submit">
 			<input type="submit" class="button-primary"
 				value="<?php _e('Save Changes') ?>" />
@@ -229,27 +242,31 @@ class ThrowsSpamAway {
 		global $newThrowsSpamAway;
 
 		$tsa_tb_on_flg = get_option('tsa_tb_on_flg');
+		$tsa_tb_url_flg = get_option('tsa_tb_url_flg');
+		$siteurl = get_option('siteurl');
 		// トラックバック OR ピンバック時にフィルタ発動
 		if ($tsa_tb_on_flg == "2" || ($tb['comment_type'] != 'trackback' && $tb['comment_type'] != 'pingback')) return $tb;
 
 		// SPAMかどうかフラグ
 		$tb_val['is_spam'] = false;
 
-		// コメント以外には判定しない（タイトルのみ日本語？ありえん・・・という仕様です。）
-		$comment = htmlspecialchars($tb['comment_text']);
+		// コメント判定
+		$comment = $tb['comment_content'];
+
 		// 検査します！
-		if (!$tb_val['is_spam'] && $newThrowsSpamAway->validation($comment)) {
+		if (!$newThrowsSpamAway->validation($comment)) {
 			$tb_val['is_spam'] = true;
 		}
-
+		// URL検索する場合、URL包含検査 （このブログのURLを含んでない場合エラー
+		if ($tsa_tb_url_flg == "1" && stripos($comment, $siteurl) == false) {
+			$tb_val['is_spam'] = true;	// スパム扱い
+		}
 		// トラックバックスパムがなければ返却・あったら捨てちゃう
-		if ( !$tb_val['is_spam'] ) {
+		if (!$tb_val['is_spam']) {
 			// トラックバック内に日本語存在（または禁止語句混入なし）
 			return $tb;
 		} else {
-			add_filter('pre_comment_approved', create_function('$a', 'return \'spam\';'));
-			return $tb;
-//			die('Your Trackback Throws Away.');
+			die('Your Trackback Throws Away.');
 		}
 	}
 }
