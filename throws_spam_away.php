@@ -4,7 +4,7 @@
  Plugin URI: http://iscw.jp/wp/
  Description: コメント内に日本語の記述が一つも存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社アイ・エス・シー　さとう　たけし
- Version: 1.5
+ Version: 1.6
  Author URI: http://iscw.jp/
  */
 
@@ -17,6 +17,8 @@ $default_caution_msg = '日本語が含まれない投稿は無視されます�
 $default_error_msg = '日本語を規定文字数以上含まない記事は投稿できませんよ。';
 // キーワードNGエラー時に表示されるエラー文言（初期設定）
 $default_ng_key_error_msg = 'NGキーワードが含まれているため投稿できません。';
+// 必須キーワードが含まれないエラー文言（初期設定）
+$default_must_key_error_msg = "必須キーワードが含まれていないため投稿できません。";
 
 /** プロセス */
 $newThrowsSpamAway = new ThrowsSpamAway;
@@ -56,6 +58,7 @@ class ThrowsSpamAway {
 		global $user_ID;
 		global $default_error_msg;
 		global $default_ng_key_error_msg;
+		global $default_must_key_error_msg;
 		global $error_type;
 
 		if( $user_ID ) {
@@ -67,11 +70,14 @@ class ThrowsSpamAway {
 			return $id;
 		}
 		$error_msg = (
-			$error_type != "ng_word" ? (
-				get_option('tsa_error_message') != null ?
-					get_option('tsa_error_message') : $default_error_msg) :
-				(get_option('tsa_ng_key_error_message') != null ?
-					get_option('tsa_ng_key_error_message') : $default_ng_key_error_msg));
+			$error_type != "must_word" ? (
+					$error_type != "ng_word" ? (
+						get_option('tsa_error_message') != null ?
+							get_option('tsa_error_message') : $default_error_msg) :
+						(get_option('tsa_ng_key_error_message') != null ?
+							get_option('tsa_ng_key_error_message') : $default_ng_key_error_msg)) :
+								(get_option('tsa_must_key_error_message') != null ?
+									get_option('tsa_must_key_error_message') : $default_must_key_error_msg));
 		wp_die( __(($error_msg != null? $error_msg : $default_error_msg).'<script type="text/javascript">window.setTimeout(location.href = "'.$_SERVER['HTTP_REFERER'].'", '.(get_option('tsa_back_content_second')!=null?get_option('tsa_back_content_second'):10).');</script>', 'throws-spam-away'));
 	}
 
@@ -116,7 +122,23 @@ class ThrowsSpamAway {
 					}
 				}
 			}
-				return TRUE;
+			// キーワードチェック（ブラックリスト）を抜けたら必須キーワードチェックを行う
+			// キーワード文字列群　※ブラックリストと重複するものはブラックリストのほうが優先です。
+			$must_keywords = get_option('tsa_must_keywords');
+			if ($must_keywords != null && $must_keywords != "") {
+				$keyword_list = mb_split(",", $must_keywords);
+				foreach ($keyword_list as $key) {
+					if (preg_match('/'.trim($key)."/u", $comment)) {
+						// OK
+					} else {
+						// 必須ワードがなかったためエラー
+						$error_type = "must_word";
+						return FALSE;
+					}
+				}
+			}
+
+			return TRUE;
 		}
 	}
 
@@ -142,6 +164,7 @@ class ThrowsSpamAway {
 		global $default_caution_msg;
 		global $default_error_msg;
 		global $default_ng_key_error_msg;
+		global $default_must_key_error_msg;
 		?>
 <div class="wrap">
 	<h2>Throws SPAM Away. Setting</h2>
@@ -195,6 +218,16 @@ class ThrowsSpamAway {
 					value="<?php echo get_option('tsa_ng_key_error_message');?>" /><br />（初期設定:<?php echo $default_ng_key_error_msg;?>）</td>
 			</tr>
 			<tr valign="top">
+				<th scope="row">その上での必須キーワード<br />（日本語でも英語（その他）でも必須としたいキーワードを半角カンマ区切りで複数設定できます。<br />指定文字列を含まない場合はエラーとなります。※複数の方が厳しくなります。<br />必須キーワードだけでも使用できます。）</th>
+				<td><input type="text" name="tsa_must_keywords" size="100"
+					value="<?php echo get_option('tsa_must_keywords');?>" /></td>
+			</tr>
+			<tr valign="top">
+				<th scope="row">必須キーワードエラー時に表示される文言<br />（元の記事に戻ってくる時間の間のみ表示）</th>
+				<td><input type="text" name="tsa_must_key_error_message" size="100"
+					value="<?php echo get_option('tsa_must_key_error_message');?>" /><br />（初期設定:<?php echo $default_must_key_error_msg;?>）</td>
+			</tr>
+			<tr valign="top">
 				<th scope="row">上記設定をトラックバック記事にも採用する</th>
 				<td><?php
 				$chk_1 = "";
@@ -227,7 +260,7 @@ class ThrowsSpamAway {
 		</table>
 		<input type="hidden" name="action" value="update" /> <input
 			type="hidden" name="page_options"
-			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_content_second,tsa_caution_message,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_tb_on_flg,tsa_tb_url_flg" />
+			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_content_second,tsa_caution_message,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_must_keywords,tsa_must_key_error_message,tsa_tb_on_flg,tsa_tb_url_flg" />
 		<p class="submit">
 			<input type="submit" class="button-primary"
 				value="<?php _e('Save Changes') ?>" />
