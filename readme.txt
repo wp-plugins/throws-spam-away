@@ -1,6 +1,6 @@
 === Plugin Name ===
-Contributors: tsato
-Donate link: http://iscw.jp/
+Contributors: taman777
+Donate link: http://blog.gti.jp/
 Tags: comments, spam
 Requires at least: 3.1
 Tested up to: 3.3.1

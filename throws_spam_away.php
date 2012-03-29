@@ -5,7 +5,7 @@
  Description: コメント内に日本語の記述が一つも存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社アイ・エス・シー　さとう　たけし
  Version: 1.6
- Author URI: http://iscw.jp/
+ Author URI: http://blog.gti.jp/
  */
 
 /** 初期設定 */
@@ -37,7 +37,7 @@ add_action('pre_comment_on_post', array(&$newThrowsSpamAway, "comment_post"), 1)
  */
 class ThrowsSpamAway {
 	// version
-	var $version = '1.4.2';
+	var $version = '1.6';
 
 	function ThrowsSpamAway() {
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
