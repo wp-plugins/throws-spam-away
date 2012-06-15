@@ -3,7 +3,7 @@ Contributors: taman777
 Donate link: http://blog.gti.jp/
 Tags: comments, spam
 Requires at least: 3.1
-Tested up to: 3.3.2
+Tested up to: 3.4
 Stable tag: 1.6.1
 
 コメント内に日本語文字列が一つも存在しない場合あたかも受け付けたように振る舞いながらも無視
