@@ -4,7 +4,7 @@
  Plugin URI: http://iscw.jp/wp/
  Description: コメント内に日本語の記述が一つも存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社ジーティーアイ　さとう　たけし
- Version: 1.6.1
+ Version: 1.7
  Author URI: http://gti.jp/
  */
 
@@ -55,7 +55,7 @@ add_action('pre_comment_on_post', array(&$newThrowsSpamAway, "comment_post"), 1)
  */
 class ThrowsSpamAway {
 	// version
-	var $version = '1.6.1';
+	var $version = '1.7';
 
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
@@ -96,7 +96,15 @@ class ThrowsSpamAway {
 							get_option('tsa_ng_key_error_message') : $default_ng_key_error_msg)) :
 								(get_option('tsa_must_key_error_message') != null ?
 									get_option('tsa_must_key_error_message') : $default_must_key_error_msg));
-		wp_die( __(($error_msg != null? $error_msg : $default_error_msg)."<script type=\"text/javascript\">window.setTimeout(location.href='".$_SERVER['HTTP_REFERER']."', ".(get_option('tsa_back_second')!=null?(((int)get_option('tsa_back_second')) * 1000):0).");</script>", 'throws-spam-away'));
+		// 元画面へ戻るタイム計算
+		$back_time = get_option('tsa_back_second')!=null?(((int)get_option('tsa_back_second')) * 1000):0;
+		// タイム値が０なら元画面へそのままリダイレクト
+		if ($back_time == 0) {
+			header("Location:".$_SERVER['HTTP_REFERER']);
+			die;
+		} else {
+			wp_die( __(($error_msg != null? $error_msg : $default_error_msg)."<script type=\"text/javascript\">window.setTimeout(location.href='".$_SERVER['HTTP_REFERER']."', ".$back_time.");</script>", 'throws-spam-away'));
+		}
 	}
 
 	/**
@@ -211,7 +219,7 @@ class ThrowsSpamAway {
 				</td>
 			</tr>
 			<tr valign="top">
-				<th scope="row">元の記事に戻ってくる時間<br />（秒）</th>
+				<th scope="row">元の記事に戻ってくる時間<br />（秒）※0の場合エラー画面表示しません。</th>
 				<td><input type="text" name="tsa_back_second"
 					value="<?php echo get_option('tsa_back_second');?>" /></td>
 			</tr>
