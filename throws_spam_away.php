@@ -95,7 +95,7 @@ class ThrowsSpamAway {
 		// IP系の検査
 		$ip = $_SERVER['REMOTE_ADDR'];
 		if (!$newThrowsSpamAway->ip_check($ip)) {
-			$tb_val['is_spam'] = TRUE;
+			// アウト！
 		} else
 		// コメント検査
 		if ($newThrowsSpamAway->validation($comment)) {
@@ -139,11 +139,12 @@ class ThrowsSpamAway {
 		global $error_type;
 		// IP制御 WordPressのスパムチェックにてスパム扱いしている投稿のIPをブロックするか
 		$ip_block_from_spam_chk_flg = get_option('tsa_ip_block_from_spam_chk_flg');
-		if ($ip_block_from_spam_chk_flg == "1") {
+
+		if ($ip_block_from_spam_chk_flg === "1") {
 			// wp_commentsの　comment_approved　カラムが「spam」のIP_ADDRESSからの投稿は無視する
 			$results = $wpdb->get_results("SELECT DISTINCT comment_author_IP FROM  $wpdb->comments WHERE comment_approved =  'spam' ORDER BY comment_author_IP ASC ");
 			foreach ($results as $item) {
-				if (trim($item->comment_author_IP) == trim($ip)) {
+				if (trim($item->comment_author_IP) == trim($target_ip)) {
 					// ブロックしたいIP
 					$error_type = "block_ip";
 					return FALSE;
@@ -164,6 +165,7 @@ class ThrowsSpamAway {
 				}
 			}
 		}
+		return TRUE;
 	}
 
 	/**
