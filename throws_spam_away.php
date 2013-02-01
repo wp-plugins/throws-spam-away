@@ -4,7 +4,7 @@
  Plugin URI: http://gti.jp/tsa/
  Description: コメント内に日本語の記述が存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社ジーティーアイ　さとう　たけし
- Version: 2.0
+ Version: 2.1
  Author URI: http://gti.jp/
  */
 
@@ -63,7 +63,7 @@ add_action('pre_comment_on_post', array(&$newThrowsSpamAway, "comment_post"), 1)
  */
 class ThrowsSpamAway {
 	// version
-	var $version = '2.0';
+	var $version = '2.1';
 
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
@@ -114,6 +114,7 @@ class ThrowsSpamAway {
 			case "block_ip" :
 				$error_msg = (get_option('tsa_block_ip_address_error_message') != NULL ?
 							get_option('tsa_block_ip_address_error_message') : $default_block_ip_address_error_msg);
+				break;
 			default :
 				$error_msg = (get_option('tsa_error_message') != NULL ?
 							get_option('tsa_error_message') : $default_error_msg);
@@ -125,7 +126,7 @@ class ThrowsSpamAway {
 			header("Location:".$_SERVER['HTTP_REFERER']);
 			die;
 		} else {
-			wp_die( __(($error_msg != NULL? $error_msg : $default_error_msg)."<script type=\"text/javascript\">window.setTimeout(location.href='".$_SERVER['HTTP_REFERER']."', ".$back_time.");</script>", 'throws-spam-away'));
+			wp_die( __(($error_msg != NULL? $error_msg : "")."<script type=\"text/javascript\">window.setTimeout(location.href='".$_SERVER['HTTP_REFERER']."', ".$back_time.");</script>", 'throws-spam-away'));
 		}
 	}
 
@@ -156,7 +157,14 @@ class ThrowsSpamAway {
 		if ($block_ip_addresses != NULL && $block_ip_addresses != "") {
 			$ip_list = mb_split(",", $block_ip_addresses);
 			foreach ($ip_list as $ip) {
-				if (trim($ip) == trim($target_ip)) {
+				// 指定IPが範囲指定の場合 例：192.168.1.0/24
+				if ( strpos( $ip, "/" ) != FALSE ) {
+					if ( $this->inCIDR( $target_ip, $ip ) ) {
+						// ブロックしたいIP
+						$error_type = "block_ip";
+						return FALSE;
+					}
+				} elseif (trim($ip) == trim($target_ip)) {
 					// ブロックしたいIP
 					$error_type = "block_ip";
 					return FALSE;
@@ -166,6 +174,25 @@ class ThrowsSpamAway {
 			}
 		}
 		return TRUE;
+	}
+
+	/**
+	 * CIDRチェック
+	 * @param string $ip
+	 * @param string $cidr
+	 * @return boolean
+	 */
+	function inCIDR($ip, $cidr) {
+		list($network, $mask_bit_len) = explode('/', $cidr);
+		if ( !is_nan($mask_bit_len) && $mask_bit_len <= 32) {
+			$host = 32 - $mask_bit_len;
+			$net = ip2long($network) >> $host << $host; // 11000000101010000000000000000000
+			$ip_net = ip2long($ip) >> $host << $host; 	// 11000000101010000000000000000000
+			return $net === $ip_net;
+		} else {
+			// 形式が不正ならば無視するためFALSE
+			return FALSE;
+		}
 	}
 
 	/**
@@ -374,12 +401,12 @@ class ThrowsSpamAway {
 			</tr>
 			<tr valign="top">
 			<th scope="row">ブロック対象のIPアドレスからの投稿時に表示される文言<br />（元の記事に戻ってくる時間の間のみ表示）</th>
-			<td><input type="text" name="tsa_block_ip_address_error_msg" size="100"
+			<td><input type="text" name="tsa_block_ip_address_error_message" size="100"
 					value="<?php echo get_option('tsa_block_ip_address_error_message');?>" /><br />（初期設定：<?php echo $default_block_ip_address_error_msg; ?>）</td>
 		</table>
 		<input type="hidden" name="action" value="update" /> <input
 			type="hidden" name="page_options"
-			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_second,tsa_caution_message,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_must_keywords,tsa_must_key_error_message,tsa_tb_on_flg,tsa_tb_url_flg,tsa_block_ip_addresses,tsa_ip_block_from_spam_chk_flg,tsa_block_ip_address_error_msg" />
+			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_second,tsa_caution_message,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_must_keywords,tsa_must_key_error_message,tsa_tb_on_flg,tsa_tb_url_flg,tsa_block_ip_addresses,tsa_ip_block_from_spam_chk_flg,tsa_block_ip_address_error_message" />
 		<p class="submit">
 			<input type="submit" class="button-primary"
 				value="<?php _e('Save Changes') ?>" />
