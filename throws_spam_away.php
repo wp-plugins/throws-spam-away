@@ -4,7 +4,7 @@
  Plugin URI: http://gti.jp/tsa/
  Description: コメント内に日本語の記述が存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社ジーティーアイ　さとう　たけし
- Version: 2.1
+ Version: 2.1.1
  Author URI: http://gti.jp/
  */
 
@@ -51,19 +51,19 @@ $newThrowsSpamAway = new ThrowsSpamAway;
 // トラックバックチェックフィルター
 add_filter('preprocess_comment', array(&$newThrowsSpamAway, 'trackback_spam_away'), 1, 1);
 // コメントフォーム表示
-add_action('comment_form', array(&$newThrowsSpamAway, "comment_form"), 9999);
+add_action('comment_form_after', array(&$newThrowsSpamAway, "comment_form"), 9999); // Ver.2.1.1 comment_form → comment_form_after
 add_action('pre_comment_on_post', array(&$newThrowsSpamAway, "comment_post"), 1);
 
 /**
  *
  * <p>ThrowsSpamAway</p>
  * WordPress's Plugin
- * @author TAMAN
+ * @author Takeshi Satoh@GTI Inc. 2013
  *
  */
 class ThrowsSpamAway {
 	// version
-	var $version = '2.1';
+	var $version = '2.1.1';
 
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
