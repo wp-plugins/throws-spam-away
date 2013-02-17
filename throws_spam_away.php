@@ -1,10 +1,10 @@
 <?php
 /*
  Plugin Name: Throws SPAM Away
- Plugin URI: http://iscw.jp/wp/
- Description: コメント内に日本語の記述が一つも存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
+ Plugin URI: http://gti.jp/tsa/
+ Description: コメント内に日本語の記述が存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社ジーティーアイ　さとう　たけし
- Version: 1.6.1
+ Version: 2.1.1
  Author URI: http://gti.jp/
  */
 
@@ -19,6 +19,14 @@ $default_error_msg = '日本語を規定文字数以上含まない記事は投�
 $default_ng_key_error_msg = 'NGキーワードが含まれているため投稿できません。';
 // 必須キーワードが含まれないエラー文言（初期設定）
 $default_must_key_error_msg = "必須キーワードが含まれていないため投稿できません。";
+// ブロックIPアドレスからの投稿の場合に表示されるエラー文言（初期設定）
+$default_block_ip_address_error_msg = "";
+// URL数制限値オーバーのエラー文言（初期設定）
+$default_url_count_over_error_msg = "";
+// URL数の制限をするか
+$default_url_count_check_flg = "1";	// 1:する
+// URL数の制限数
+$default_ok_url_count = 3;	// ３つまで許容
 /** オプションキー */
 // 日本語が存在しない時エラーとするかフラグ			[tsa_on_flg] 1:する 2:しない
 // 日本語文字列含有数 （入力値以下ならエラー）	[tsa_japanese_string_min_count] 数値型
@@ -37,25 +45,35 @@ $default_must_key_error_msg = "必須キーワードが含まれていないた�
 // この設定をトラックバック記事にも採用するか		[tsa_tb_on_flg] 1:する 2:しない
 // トラックバック記事にも採用する場合、ついでにこちらのURLが含まれているか判断するか
 //																							[tsa_tb_url_flg] 1:する 2:しない
+// WordPressのcommentsテーブルで「spam」判定されたことがあるIPアドレスからの投稿を無視するか
+// 																							[tsa_ip_block_from_spam_chk_flg] 1:する その他：しない
+// ブロックしたいIPアドレスを任意で入力（半角カンマ区切りで複数設定できます。）
+//																							[tsa_block_ip_addresses] 文字列型
+// ブロック対象IPアドレスからの投稿時に表示される文言（元の記事に戻ってくる時間の間のみ表示）
+// 																							[tsa_block_ip_address_error_message] 文字列型
+// URL（単純に'http'文字列のチェックのみ）文字列数を制限するか                              [tsa_url_count_on_flg] 1:する その他：しない
+// URL（単純に'http'文字列のチェックのみ）文字列の許容数                                    [tsa_ok_url_count] 数値型
+// URL（単純に'http'文字列のチェックのみ）文字列許容数オーバー時に表示される文言（元の記事に戻ってくる時間の間のみ表示）
+//                                                                                          [tsa_url_count_over_error_message] 文字列型
 
 /** プロセス */
 $newThrowsSpamAway = new ThrowsSpamAway;
 // トラックバックチェックフィルター
 add_filter('preprocess_comment', array(&$newThrowsSpamAway, 'trackback_spam_away'), 1, 1);
 // コメントフォーム表示
-add_action('comment_form', array(&$newThrowsSpamAway, "comment_form"), 9999);
+add_action('comment_form_after', array(&$newThrowsSpamAway, "comment_form"), 9999); // Ver.2.1.1 comment_form → comment_form_after
 add_action('pre_comment_on_post', array(&$newThrowsSpamAway, "comment_post"), 1);
 
 /**
  *
  * <p>ThrowsSpamAway</p>
  * WordPress's Plugin
- * @author TAMAN
+ * @author Takeshi Satoh@GTI Inc. 2013
  *
  */
 class ThrowsSpamAway {
 	// version
-	var $version = '1.6.1';
+	var $version = '2.1.1';
 
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
@@ -66,7 +84,7 @@ class ThrowsSpamAway {
 		// 注意文言表示
 		$caution_msg = get_option('tsa_caution_message');
 		echo '<div id="throwsSpamAway">';
-		echo ($caution_msg != null? $caution_msg : $default_caution_msg);
+		echo ($caution_msg != NULL? $caution_msg : $default_caution_msg);
 		echo '</div>';
 		return TRUE;
 	}
@@ -77,6 +95,8 @@ class ThrowsSpamAway {
 		global $default_error_msg;
 		global $default_ng_key_error_msg;
 		global $default_must_key_error_msg;
+		global $default_block_ip_address_error_msg;
+		global $default_url_count_over_error_msg;
 		global $error_type;
 
 		if( $user_ID ) {
@@ -84,19 +104,111 @@ class ThrowsSpamAway {
 		}
 
 		$comment = $_POST["comment"];
+		// IP系の検査
+		$ip = $_SERVER['REMOTE_ADDR'];
+		if (!$newThrowsSpamAway->ip_check($ip)) {
+			// アウト！
+		} else
+		// コメント検査
 		if ($newThrowsSpamAway->validation($comment)) {
 			return $id;
 		}
-		$error_msg = (
-			$error_type != "must_word" ? (
-					$error_type != "ng_word" ? (
-						get_option('tsa_error_message') != null ?
-							get_option('tsa_error_message') : $default_error_msg) :
-						(get_option('tsa_ng_key_error_message') != null ?
-							get_option('tsa_ng_key_error_message') : $default_ng_key_error_msg)) :
-								(get_option('tsa_must_key_error_message') != null ?
-									get_option('tsa_must_key_error_message') : $default_must_key_error_msg));
-		wp_die( __(($error_msg != null? $error_msg : $default_error_msg)."<script type=\"text/javascript\">window.setTimeout(location.href='".$_SERVER['HTTP_REFERER']."', ".(get_option('tsa_back_second')!=null?(((int)get_option('tsa_back_second')) * 1000):0).");</script>", 'throws-spam-away'));
+		$error_msg = "";
+		switch ($error_type) {
+			case "must_word" :
+				$error_msg = (get_option('tsa_must_key_error_message') != NULL ?
+							get_option('tsa_must_key_error_message') : $default_must_key_error_msg);
+				break;
+			case "ng_word" :
+				$error_msg = (get_option('tsa_ng_key_error_message') != NULL ?
+							get_option('tsa_ng_key_error_message') : $default_ng_key_error_msg);
+				break;
+			case "block_ip" :
+				$error_msg = (get_option('tsa_block_ip_address_error_message') != NULL ?
+							get_option('tsa_block_ip_address_error_message') : $default_block_ip_address_error_msg);
+				break;
+			case "url_count_over" :
+				$error_msg = (get_option('tsa_url_count_over_error_message') != NULL ?
+							get_option('tsa_url_count_over_error_message') : $default_url_count_over_error_msg);
+				break;
+			default :
+				$error_msg = (get_option('tsa_error_message') != NULL ?
+							get_option('tsa_error_message') : $default_error_msg);
+		}
+		// 元画面へ戻るタイム計算
+		$back_time = get_option('tsa_back_second')!=NULL?(((int)get_option('tsa_back_second')) * 1000):0;
+		// タイム値が０なら元画面へそのままリダイレクト
+		if ($back_time == 0) {
+			header("Location:".$_SERVER['HTTP_REFERER']);
+			die;
+		} else {
+			wp_die( __(($error_msg != NULL? $error_msg : "")."<script type=\"text/javascript\">window.setTimeout(location.href='".$_SERVER['HTTP_REFERER']."', ".$back_time.");</script>", 'throws-spam-away'));
+		}
+	}
+
+	/**
+	 * IPアドレスのチェックメソッド
+	 * @param string $target_ip
+	 */
+	function ip_check($target_ip) {
+		global $wpdb; // WordPress DBアクセス
+		global $newThrowsSpamAway;
+		global $error_type;
+		// IP制御 WordPressのスパムチェックにてスパム扱いしている投稿のIPをブロックするか
+		$ip_block_from_spam_chk_flg = get_option('tsa_ip_block_from_spam_chk_flg');
+
+		if ($ip_block_from_spam_chk_flg === "1") {
+			// wp_commentsの　comment_approved　カラムが「spam」のIP_ADDRESSからの投稿は無視する
+			$results = $wpdb->get_results("SELECT DISTINCT comment_author_IP FROM  $wpdb->comments WHERE comment_approved =  'spam' ORDER BY comment_author_IP ASC ");
+			foreach ($results as $item) {
+				if (trim($item->comment_author_IP) == trim($target_ip)) {
+					// ブロックしたいIP
+					$error_type = "block_ip";
+					return FALSE;
+				}
+			}
+		}
+		// IP制御 任意のIPアドレスをあればブロックする
+		$block_ip_addresses = get_option('tsa_block_ip_addresses');
+		if ($block_ip_addresses != NULL && $block_ip_addresses != "") {
+			$ip_list = mb_split(",", $block_ip_addresses);
+			foreach ($ip_list as $ip) {
+				// 指定IPが範囲指定の場合 例：192.168.1.0/24
+				if ( strpos( $ip, "/" ) != FALSE ) {
+					if ( $this->inCIDR( $target_ip, $ip ) ) {
+						// ブロックしたいIP
+						$error_type = "block_ip";
+						return FALSE;
+					}
+				} elseif (trim($ip) == trim($target_ip)) {
+					// ブロックしたいIP
+					$error_type = "block_ip";
+					return FALSE;
+				} else {
+					// セーフIP
+				}
+			}
+		}
+		return TRUE;
+	}
+
+	/**
+	 * CIDRチェック
+	 * @param string $ip
+	 * @param string $cidr
+	 * @return boolean
+	 */
+	function inCIDR($ip, $cidr) {
+		list($network, $mask_bit_len) = explode('/', $cidr);
+		if ( !is_nan($mask_bit_len) && $mask_bit_len <= 32) {
+			$host = 32 - $mask_bit_len;
+			$net = ip2long($network) >> $host << $host; // 11000000101010000000000000000000
+			$ip_net = ip2long($ip) >> $host << $host; 	// 11000000101010000000000000000000
+			return $net === $ip_net;
+		} else {
+			// 形式が不正ならば無視するためFALSE
+			return FALSE;
+		}
 	}
 
 	/**
@@ -106,6 +218,8 @@ class ThrowsSpamAway {
 	function validation($comment) {
 		global $newThrowsSpamAway;
 		global $error_type;
+		global $default_url_count_check_flg;	// URL数を制御するか初期設定値
+		global $default_ok_url_count;	// 制限する場合のURL数初期設定値
 		// まずはシングルバイトだけならエラー
 		if (get_option('tsa_on_flg') != "2" && strlen(bin2hex($comment)) / 2 == mb_strlen($comment)) {
 			return FALSE;
@@ -122,7 +236,7 @@ class ThrowsSpamAway {
 					if (preg_match('/[ァ-ヶー]+/u', $it)){ $count_flg += 1; }
 					if (preg_match('/[ぁ-ん]+/u', $it)){ $count_flg += 1; }
 				}
-				$flg = ((get_option('tsa_japanese_string_min_count')!= null?
+				$flg = ((get_option('tsa_japanese_string_min_count')!= NULL?
 					intval(get_option('tsa_japanese_string_min_count')):0) < $count_flg);
 				if ($flg == FALSE) {
 					return FALSE;
@@ -131,7 +245,7 @@ class ThrowsSpamAway {
 			// 日本語文字列チェック抜けたらキーワードチェックを行う
 			// キーワード文字列群
 			$ng_keywords = get_option('tsa_ng_keywords');
-			if ($ng_keywords != null && $ng_keywords != "") {
+			if ($ng_keywords != NULL && $ng_keywords != "") {
 				$keyword_list = mb_split(",", $ng_keywords);
 				foreach ($keyword_list as $key) {
 					if (preg_match('/'.trim($key)."/u", $comment)) {
@@ -143,7 +257,7 @@ class ThrowsSpamAway {
 			// キーワードチェック（ブラックリスト）を抜けたら必須キーワードチェックを行う
 			// キーワード文字列群　※ブラックリストと重複するものはブラックリストのほうが優先です。
 			$must_keywords = get_option('tsa_must_keywords');
-			if ($must_keywords != null && $must_keywords != "") {
+			if ($must_keywords != NULL && $must_keywords != "") {
 				$keyword_list = mb_split(",", $must_keywords);
 				foreach ($keyword_list as $key) {
 					if (preg_match('/'.trim($key)."/u", $comment)) {
@@ -153,6 +267,17 @@ class ThrowsSpamAway {
 						$error_type = "must_word";
 						return FALSE;
 					}
+				}
+			}
+			// URL数チェック
+			$url_count_check = get_option('tsa_url_count_on_flg') != NULL ? get_option('tsa_url_count_on_flg') : $default_url_count_check_flg;
+			// 許容URL数設定値
+			$ok_url_count = get_option('tsa_ok_url_count') != NULL ? intval(get_option('tsa_ok_url_count')) : $default_ok_url_count; // デフォルト値３（３つまで許容）
+			if ( $url_count_check != "2" ) {
+				if ( substr_count( strtolower( $comment ), 'http') > $ok_url_count) {
+					// URL文字列（httpの数）が多いエラー
+					$error_type = "url_count_over";
+					return FALSE;
 				}
 			}
 
@@ -179,10 +304,14 @@ class ThrowsSpamAway {
 	 * Admin options page
 	 */
 	function options_page() {
+		global $wpdb; // WordPress DBアクセス
 		global $default_caution_msg;
 		global $default_error_msg;
 		global $default_ng_key_error_msg;
 		global $default_must_key_error_msg;
+		global $default_block_ip_address_error_msg;
+		global $default_url_count_over_error_msg;
+
 		?>
 <div class="wrap">
 	<h2>Throws SPAM Away. Setting</h2>
@@ -200,7 +329,7 @@ class ThrowsSpamAway {
 					$chk_1 = " checked=\"checked\"";
 				}
 				 ?>
-				 <label><input type="radio" name="tsa_on_flg"	value="1"<?php echo $chk_1;?>/>&nbsp;する</label>&nbsp;
+				 <label><input type="radio" name="tsa_on_flg" value="1"<?php echo $chk_1;?>/>&nbsp;する</label>&nbsp;
 				 <label><input type="radio" name="tsa_on_flg" value="2"<?php echo $chk_2;?>/>&nbsp;しない</label>
 				</td>
 			</tr>
@@ -211,7 +340,7 @@ class ThrowsSpamAway {
 				</td>
 			</tr>
 			<tr valign="top">
-				<th scope="row">元の記事に戻ってくる時間<br />（秒）</th>
+				<th scope="row">元の記事に戻ってくる時間<br />（秒）※0の場合エラー画面表示しません。</th>
 				<td><input type="text" name="tsa_back_second"
 					value="<?php echo get_option('tsa_back_second');?>" /></td>
 			</tr>
@@ -224,6 +353,28 @@ class ThrowsSpamAway {
 				<th scope="row">日本語文字列規定値未満エラー時に表示される文言<br />（元の記事に戻ってくる時間の間のみ表示）</th>
 				<td><input type="text" name="tsa_error_message" size="100"
 					value="<?php echo get_option('tsa_error_message');?>" /><br />（初期設定:<?php echo $default_error_msg;?>）</td>
+			</tr>
+			<tr valign="top">
+			<th scope="row">URLらしき文字列が混入している場合エラーとするか</th>
+				<td><?php
+				$chk_1 = "";
+				$chk_2 = "";
+				if (get_option('tsa_url_count_on_flg', "2") == "2") {
+					$chk_2 = " checked=\"checked\"";
+				} else {
+					$chk_1 = " checked=\"checked\"";
+				}
+				 ?>
+				 <label><input type="radio" name="tsa_url_count_on_flg" value="1"<?php echo $chk_1;?>/>&nbsp;する</label>&nbsp;
+				 <label><input type="radio" name="tsa_url_count_on_flg" value="2"<?php echo $chk_2;?>/>&nbsp;しない</label><br />
+				 する場合の制限数（入力数値まで許容）：<input type="text" name="tsa_ok_url_count" size="2"
+					value="<?php echo get_option('tsa_ok_url_count');?>" />
+				</td>
+			</tr>
+			<tr valign="top">
+				<th scope="row">任意のIPアドレスからの投稿も無視したい場合、対象となるIPアドレスを記述してください。<br />カンマ区切りで複数設定できます。（半角数字とドットのみ）</th>
+				<td><input type="text" name="tsa_url_count_over_error_message" size="100"
+					value="<?php echo get_option('tsa_url_count_over_error_message');?>" /><br />（初期設定:<?php echo $default_url_count_over_error_msg;?>）</td>
 			</tr>
 			<tr valign="top">
 				<th scope="row">その他NGキーワード<br />（日本語でも英語（その他）でもNGとしたいキーワードを半角カンマ区切りで複数設定できます。<br />挙動は同じです。NGキーワードだけでも使用できます。）</th>
@@ -256,7 +407,7 @@ class ThrowsSpamAway {
 					$chk_1 = " checked=\"checked\"";
 				}
 				 ?>
-				 <label><input type="radio" name="tsa_tb_on_flg"	value="1"<?php echo $chk_1;?>/>&nbsp;する</label>&nbsp;
+				 <label><input type="radio" name="tsa_tb_on_flg" value="1"<?php echo $chk_1;?>/>&nbsp;する</label>&nbsp;
 				 <label><input type="radio" name="tsa_tb_on_flg" value="2"<?php echo $chk_2;?>/>&nbsp;しない</label>
 				</td>
 			</tr>
@@ -271,14 +422,45 @@ class ThrowsSpamAway {
 					$chk_1 = " checked=\"checked\"";
 				}
 				 ?>
-				 <label><input type="radio" name="tsa_tb_url_flg"	value="1"<?php echo $chk_1;?>/>&nbsp;する</label>&nbsp;
+				 <label><input type="radio" name="tsa_tb_url_flg" value="1"<?php echo $chk_1;?>/>&nbsp;する</label>&nbsp;
 				 <label><input type="radio" name="tsa_tb_url_flg" value="2"<?php echo $chk_2;?>/>&nbsp;しない</label>
 				</td>
 			</tr>
+			<tr valign="top">
+				<th scope="row">WordPressのコメントで「スパム」にしたIPからの投稿にも採用する</th>
+				<td><?php
+				$chk = "";
+				if (get_option('tsa_ip_block_from_spam_chk_flg') == "1") {
+					$chk = "checked=\"checked\"";
+				} else {
+					$chk = "";
+				}
+				?>
+				<label><input type="checkbox" name="tsa_ip_block_from_spam_chk_flg" value="1"<?php echo $chk; ?>/>&nbsp;スパム投稿設定したIPアドレスからの投稿も無視する</label><br />
+<?php
+			// wp_commentsの　comment_approved　カラムが「spam」のIP_ADDRESSからの投稿は無視する
+			$results = $wpdb->get_results("SELECT DISTINCT comment_author_IP FROM  $wpdb->comments WHERE comment_approved =  'spam' ORDER BY comment_author_IP ASC ");
+?>現在「spam」フラグが付いているIPアドレス：<?php
+			foreach ($results as $item) {
+				// ブロックしたいIP
+?><b><?php echo $item->comment_author_IP; ?></b>&nbsp;<?php
+			}
+?>
+				</td>
+			</tr>
+			<tr valign="top">
+				<th scope="row">任意のIPアドレスからの投稿も無視したい場合、対象となるIPアドレスを記述してください。<br />カンマ区切りで複数設定できます。（半角数字とドットのみ）</th>
+				<td><input type="text" name="tsa_block_ip_addresses" size="100"
+					value="<?php echo get_option('tsa_block_ip_addresses');?>" /></td>
+			</tr>
+			<tr valign="top">
+			<th scope="row">ブロック対象のIPアドレスからの投稿時に表示される文言<br />（元の記事に戻ってくる時間の間のみ表示）</th>
+			<td><input type="text" name="tsa_block_ip_address_error_message" size="100"
+					value="<?php echo get_option('tsa_block_ip_address_error_message');?>" /><br />（初期設定：<?php echo $default_block_ip_address_error_msg; ?>）</td>
 		</table>
 		<input type="hidden" name="action" value="update" /> <input
 			type="hidden" name="page_options"
-			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_second,tsa_caution_message,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_must_keywords,tsa_must_key_error_message,tsa_tb_on_flg,tsa_tb_url_flg" />
+			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_second,tsa_caution_message,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_must_keywords,tsa_must_key_error_message,tsa_tb_on_flg,tsa_tb_url_flg,tsa_block_ip_addresses,tsa_ip_block_from_spam_chk_flg,tsa_block_ip_address_error_message,tsa_url_count_on_flg,tsa_ok_url_count,tsa_url_count_over_error_message" />
 		<p class="submit">
 			<input type="submit" class="button-primary"
 				value="<?php _e('Save Changes') ?>" />
@@ -299,18 +481,23 @@ class ThrowsSpamAway {
 		if ($tsa_tb_on_flg == "2" || ($tb['comment_type'] != 'trackback' && $tb['comment_type'] != 'pingback')) return $tb;
 
 		// SPAMかどうかフラグ
-		$tb_val['is_spam'] = false;
+		$tb_val['is_spam'] = FALSE;
 
 		// コメント判定
 		$comment = $tb['comment_content'];
 
+		// IP系の検査
+		$ip = $_SERVER['REMOTE_ADDR'];
+		if (!$newThrowsSpamAway->ip_check($ip)) {
+			$tb_val['is_spam'] = TRUE;
+		} else
 		// 検査します！
 		if (!$newThrowsSpamAway->validation($comment)) {
-			$tb_val['is_spam'] = true;
-		}
+			$tb_val['is_spam'] = TRUE;
+		} else
 		// URL検索する場合、URL包含検査 （このブログのURLを含んでない場合エラー
-		if ($tsa_tb_url_flg == "1" && stripos($comment, $siteurl) == false) {
-			$tb_val['is_spam'] = true;	// スパム扱い
+		if ($tsa_tb_url_flg == "1" && stripos($comment, $siteurl) == FALSE) {
+			$tb_val['is_spam'] = TRUE;	// スパム扱い
 		}
 		// トラックバックスパムがなければ返却・あったら捨てちゃう
 		if (!$tb_val['is_spam']) {
@@ -321,4 +508,3 @@ class ThrowsSpamAway {
 		}
 	}
 }
-?>

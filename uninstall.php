@@ -17,4 +17,8 @@ delete_option('tsa_must_keywords');
 delete_option('tsa_must_key_error_message');
 delete_option('tsa_tb_on_flg');
 delete_option('tsa_tb_url_flg');
+// ver.2.0
+delete_option('tsa_ip_block_from_spam_chk_flg');
+delete_option('tsa_block_ip_addresses');
+delete_option('tsa_block_ip_address_error_message');
 ?>
