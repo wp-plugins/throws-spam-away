@@ -21,4 +21,11 @@ delete_option('tsa_tb_url_flg');
 delete_option('tsa_ip_block_from_spam_chk_flg');
 delete_option('tsa_block_ip_addresses');
 delete_option('tsa_block_ip_address_error_message');
+// ver.2.2
+delete_option('tsa_url_count_on_flg');
+delete_option('tsa_ok_url_count');
+delete_option('tsa_url_count_over_error_message');
+// ver.2.3
+delete_option('tsa_meta_version');
+delete_option('tsa_spam_data_save');
 ?>
