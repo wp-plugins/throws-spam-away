@@ -618,7 +618,7 @@ $gdays = 30;
 $unique_color="#114477";
 $web_color="#3377B6";
 
-$results = $wpdb->get_results("SELECT SUBSTRING(post_date,1,10) AS spam_date,COUNT(*) as spam_count FROM `wp_tsa_spam` group by spam_date order by spam_date asc");
+$results = $wpdb->get_results("SELECT SUBSTRING(post_date,1,10) AS spam_date,COUNT(*) as spam_count FROM `".$this->table_name."` group by spam_date order by spam_date asc");
 ?>
 <h3>スパム投稿３０日間の推移</h3>
 <?php
