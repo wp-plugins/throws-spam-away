@@ -4,9 +4,12 @@
  Plugin URI: http://gti.jp/tsa/
  Description: コメント内に日本語の記述が存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社ジーティーアイ　さとう　たけし
- Version: 2.2
+ Version: 2.3
  Author URI: http://gti.jp/
  */
+
+// スパムデータベースバージョン
+$tsa_db_version = 2.3;
 
 /** 初期設定 */
 // エラー種別
@@ -77,23 +80,81 @@ add_action('pre_comment_on_post', array(&$newThrowsSpamAway, "comment_post"), 1)
  */
 class ThrowsSpamAway {
 	// version
-	var $version = '2.2';
-
+	var $version = '2.3';
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
+	}
+
+	/**
+	 * スパム投稿テーブル作成
+	 * $flg がTRUEなら強制的にテーブル作成
+	 */
+	function tsa_createTbl() {
+		global $wpdb;
+		global $tsa_db_version;
+
+		// テーブル作成要フラグ
+		$flg = FALSE;
+		// 接頭辞（wp_）を付けてテーブル名を設定
+		$this->table_name = $wpdb->prefix . 'tsa_spam';
+		if($wpdb->get_var("SHOW TABLES LIKE '$this->table_name'") != $this->table_name) {
+			// テーブルが存在しないため作成する
+			$flg = TRUE;
+		}
+
+		//DBのバージョン
+		//$tsa_db_version
+		//現在のDBバージョン取得
+		$installed_ver = get_option( 'tsa_meta_version', 0 );
+		// DBバージョンが低い　または　テーブルが存在しない場合は作成
+		if( $installed_ver < $tsa_db_version || $flg == TRUE) {
+			// DBバージョンは 2.3未満が存在しないためSQLはCREATE文のみ
+			$sql = "CREATE TABLE " . $this->table_name . " (
+			  meta_id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			  post_id bigint(20) UNSIGNED DEFAULT '0' NOT NULL,
+			  ip_address text,
+			  post_date timestamp,
+			  UNIQUE KEY meta_id (meta_id)
+			)
+			CHARACTER SET 'utf8';";
+			require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+			dbDelta( $sql );
+			//オプションにDBバージョン保存
+			update_option( 'tsa_meta_version', $tsa_db_version );
+		}
+	}
+
+	/**
+	 * スパム投稿の記録
+	 * @param string $post_id
+	 * @param string $ip_address
+	 */
+	function save_post_meta( $post_id, $ip_address ) {
+		if ( get_option('tsa_spam_data_save', $default_spam_data_save) != "1" )  return;
+
+		global $wpdb;
+
+		//保存するために配列にする
+		$set_arr = array(
+				'post_id' => $post_id,
+				'ip_address' => $ip_address
+		);
+
+		//レコード新規追加
+		$wpdb->insert( $this->table_name, $set_arr );
+		$wpdb->show_errors();
+		return;
 	}
 
 	function comment_form() {
 		global $default_caution_msg;
 		// 注意文言表示
-		$caution_msg = get_option('tsa_caution_message');
-		echo '<div id="throwsSpamAway">';
-		echo ($caution_msg != NULL? $caution_msg : $default_caution_msg);
-		echo '</div>';
+		$caution_msg = get_option( 'tsa_caution_message', $default_caution_msg );
+		echo '<div id="throwsSpamAway">'.$caution_msg.'</div>';
 		return TRUE;
 	}
 
-	function comment_post($id) {
+	function comment_post( $id ) {
 		global $newThrowsSpamAway;
 		global $user_ID;
 		global $default_back_second;
@@ -107,42 +168,44 @@ class ThrowsSpamAway {
 		if( $user_ID ) {
 			return $id;
 		}
-
-		$comment = $_POST["comment"];
+		// コメント（comment）及び名前（author）の中も検査
+		$comment = $_POST["author"] . $_POST["comment"];
 		// IP系の検査
 		$ip = $_SERVER['REMOTE_ADDR'];
-		if (!$newThrowsSpamAway->ip_check($ip)) {
+		if ( !$newThrowsSpamAway->ip_check( $ip ) ) {
 			// アウト！
 		} else
 		// コメント検査
-		if ($newThrowsSpamAway->validation($comment)) {
+		if ( $newThrowsSpamAway->validation( $comment ) ) {
 			return $id;
 		}
 		$error_msg = "";
-		switch ($error_type) {
+		switch ( $error_type ) {
 			case "must_word" :
-				$error_msg = get_option('tsa_must_key_error_message', $default_must_key_error_msg);
+				$error_msg = get_option( 'tsa_must_key_error_message', $default_must_key_error_msg );
 				break;
 			case "ng_word" :
-				$error_msg = get_option('tsa_ng_key_error_message', $default_ng_key_error_msg);
+				$error_msg = get_option( 'tsa_ng_key_error_message', $default_ng_key_error_msg );
 				break;
 			case "block_ip" :
-				$error_msg = get_option('tsa_block_ip_address_error_message', $default_block_ip_address_error_msg);
+				$error_msg = get_option( 'tsa_block_ip_address_error_message', $default_block_ip_address_error_msg );
 				break;
 			case "url_count_over" :
-				$error_msg = get_option('tsa_url_count_over_error_message', $default_url_count_over_error_msg);
+				$error_msg = get_option( 'tsa_url_count_over_error_message', $default_url_count_over_error_msg );
 				break;
 			default :
-				$error_msg = get_option('tsa_error_message', $default_error_msg);
+				$error_msg = get_option( 'tsa_error_message', $default_error_msg );
 		}
+		// 記録する場合はDB記録
+		if ( get_option( 'tsa_spam_data_save', $default_spam_data_save ) == "1" ) $this->save_post_meta( $id, $ip );
 		// 元画面へ戻るタイム計算
-		$back_time = ((int)get_option('tsa_back_second', $default_back_second)) * 1000;
+		$back_time = ( (int) get_option( 'tsa_back_second', $default_back_second ) ) * 1000;
 		// タイム値が０なら元画面へそのままリダイレクト
-		if ($back_time == 0) {
-			header("Location:".$_SERVER['HTTP_REFERER']);
+		if ( $back_time == 0 ) {
+			header( "Location:".$_SERVER['HTTP_REFERER'] );
 			die;
 		} else {
-			wp_die( __(($error_msg != NULL? $error_msg : "")."<script type=\"text/javascript\">window.setTimeout(location.href='".$_SERVER['HTTP_REFERER']."', ".$back_time.");</script>", 'throws-spam-away'));
+			wp_die( __($error_msg."<script type=\"text/javascript\">window.setTimeout(location.href='".$_SERVER['HTTP_REFERER']."', ".$back_time.");</script>", 'throws-spam-away'));
 		}
 	}
 
@@ -150,18 +213,18 @@ class ThrowsSpamAway {
 	 * IPアドレスのチェックメソッド
 	 * @param string $target_ip
 	 */
-	function ip_check($target_ip) {
+	function ip_check( $target_ip ) {
 		global $wpdb; // WordPress DBアクセス
 		global $newThrowsSpamAway;
 		global $error_type;
 		// IP制御 WordPressのスパムチェックにてスパム扱いしている投稿のIPをブロックするか
-		$ip_block_from_spam_chk_flg = get_option('tsa_ip_block_from_spam_chk_flg');
+		$ip_block_from_spam_chk_flg = get_option( 'tsa_ip_block_from_spam_chk_flg' );
 
 		if ($ip_block_from_spam_chk_flg === "1") {
 			// wp_commentsの　comment_approved　カラムが「spam」のIP_ADDRESSからの投稿は無視する
-			$results = $wpdb->get_results("SELECT DISTINCT comment_author_IP FROM  $wpdb->comments WHERE comment_approved =  'spam' ORDER BY comment_author_IP ASC ");
-			foreach ($results as $item) {
-				if (trim($item->comment_author_IP) == trim($target_ip)) {
+			$results = $wpdb->get_results( "SELECT DISTINCT comment_author_IP FROM  $wpdb->comments WHERE comment_approved =  'spam' ORDER BY comment_author_IP ASC " );
+			foreach ( $results as $item ) {
+				if ( trim( $item->comment_author_IP ) == trim( $target_ip ) ) {
 					// ブロックしたいIP
 					$error_type = "block_ip";
 					return FALSE;
@@ -169,10 +232,10 @@ class ThrowsSpamAway {
 			}
 		}
 		// IP制御 任意のIPアドレスをあればブロックする
-		$block_ip_addresses = get_option('tsa_block_ip_addresses', "");
-		if ($block_ip_addresses != NULL && $block_ip_addresses != "") {
-			$ip_list = mb_split(",", $block_ip_addresses);
-			foreach ($ip_list as $ip) {
+		$block_ip_addresses = get_option( 'tsa_block_ip_addresses', "" );
+		if ( $block_ip_addresses != NULL && $block_ip_addresses != "" ) {
+			$ip_list = mb_split(  ",", $block_ip_addresses );
+			foreach ( $ip_list as $ip ) {
 				// 指定IPが範囲指定の場合 例：192.168.1.0/24
 				if ( strpos( $ip, "/" ) != FALSE ) {
 					if ( $this->inCIDR( $target_ip, $ip ) ) {
@@ -180,7 +243,7 @@ class ThrowsSpamAway {
 						$error_type = "block_ip";
 						return FALSE;
 					}
-				} elseif (trim($ip) == trim($target_ip)) {
+				} elseif ( trim( $ip ) == trim( $target_ip ) ) {
 					// ブロックしたいIP
 					$error_type = "block_ip";
 					return FALSE;
@@ -293,11 +356,17 @@ class ThrowsSpamAway {
 	 * Callback admin_menu
 	 */
 	function admin_menu() {
-		if ( function_exists( 'add_options_page' ) AND current_user_can( 'manage_options' ) ) {
-			// add options page
-			$page = add_options_page( __( 'Throws SPAM Away', $this->domain ), __( 'Throws SPAM Away', $this->domain ),
-								'manage_options', __FILE__, array( $this, 'options_page' ) );
+		$mincap="level_8";
+		add_menu_page(__( 'Throws SPAM Away', $this->domain ), __( 'Throws SPAM Away', $this->domain ), $mincap, __FILE__, array( $this, 'options_page' ) );
+
+		// 従来通りスパムデータ保存しない場合はスルーする
+		if ( get_option( 'tsa_spam_data_save' ) != 1 ) {
+			// N/A
+		} else {
+			// プラグインアップデート時もチェックするため常に・・・
+			$this->tsa_createTbl(TRUE);
 		}
+
 	}
 
 	/**
@@ -314,6 +383,7 @@ class ThrowsSpamAway {
 		global $default_block_ip_address_error_msg;
 		global $default_url_count_over_error_msg;
 		global $default_ok_url_count;
+		global $default_spam_data_save;
 		?>
 <style>
 table.form-table { }
@@ -349,7 +419,7 @@ function addIpAddresses(newAddressStr) {
 }
 </script>
 <div class="wrap">
-	<h2>Throws SPAM Away. Setting</h2>
+	<h2>Throws SPAM Away設定</h2>
 	<form method="post" action="options.php">
 	<h3>スパム対策機能 設定</h3>
 	<?php wp_nonce_field('update-options'); ?>
@@ -489,7 +559,7 @@ function addIpAddresses(newAddressStr) {
 <?php
 			// wp_commentsの　comment_approved　カラムが「spam」のIP_ADDRESSからの投稿は無視する
 			$results = $wpdb->get_results("SELECT DISTINCT comment_author_IP FROM  $wpdb->comments WHERE comment_approved =  'spam' ORDER BY comment_author_IP ASC ");
-?>現在「spam」フラグが付いているIPアドレス：<?php
+?>現在「spam」フラグが付いているIPアドレス：<br /><blockquote><?php
 			$add_ip_addresses = "";
 			foreach ($results as $item) {
 				$spam_ip = $item->comment_author_IP;
@@ -500,7 +570,8 @@ function addIpAddresses(newAddressStr) {
 				$add_ip_addresses .= $spam_ip;
 ?><b><?php echo $spam_ip; ?></b><br /><?php
 			}
-?>&nbsp;<input type="button" onclick="javascript:addIpAddresses('<?php echo $add_ip_addresses; ?>');" value="これらのIPアドレスを任意のブロック対象IPアドレスにコピーする" />
+?>&nbsp;<input type="button" onclick="javascript:addIpAddresses('<?php echo $add_ip_addresses; ?>');" value="これらのIPアドレスを任意のブロック対象IPアドレスにコピーする" /><br />
+			</blockquote>
 				</td>
 			</tr>
 			<tr valign="top">
@@ -512,54 +583,179 @@ function addIpAddresses(newAddressStr) {
 			<th scope="row">ブロック対象のIPアドレスからの投稿時に表示される文言<br />（元の記事に戻ってくる時間の間のみ表示）</th>
 			<td><input type="text" name="tsa_block_ip_address_error_message" size="80"
 					value="<?php echo get_option('tsa_block_ip_address_error_message', $default_block_ip_address_error_msg);?>" /><br />（初期設定：<?php echo $default_block_ip_address_error_msg; ?>）</td>
+			</tr>
 		</table>
+	<h3>スパムデータベース</h3>
+		<table class="form-table">
+			<tr valign="top">
+				<th scope="row">スパムコメント投稿情報を保存しますか？</th>
+				<td><?php
+				$chk = "";
+				if (get_option('tsa_spam_data_save', "") == "1") {
+					$chk = "checked=\"checked\"";
+				} else {
+					$chk = "";
+				}
+				?>
+				<label><input type="checkbox" name="tsa_spam_data_save" value="1"<?php echo $chk; ?>/>&nbsp;スパムコメント情報を保存する</label><br />※Throws SPAM Away設定画面表示時に時間がかかることがあります。<br />※「保存する」を解除した場合でもテーブルは残りますので３０日以内の取得データは表示されます。
+				</td>
+			</tr>
+		</table>
+
 		<input type="hidden" name="action" value="update" /> <input
 			type="hidden" name="page_options"
-			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_second,tsa_caution_message,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_must_keywords,tsa_must_key_error_message,tsa_tb_on_flg,tsa_tb_url_flg,tsa_block_ip_addresses,tsa_ip_block_from_spam_chk_flg,tsa_block_ip_address_error_message,tsa_url_count_on_flg,tsa_ok_url_count,tsa_url_count_over_error_message" />
+			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_second,tsa_caution_message,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_must_keywords,tsa_must_key_error_message,tsa_tb_on_flg,tsa_tb_url_flg,tsa_block_ip_addresses,tsa_ip_block_from_spam_chk_flg,tsa_block_ip_address_error_message,tsa_url_count_on_flg,tsa_ok_url_count,tsa_url_count_over_error_message,tsa_spam_data_save" />
 		<p class="submit">
 			<input type="submit" class="button-primary"
 				value="<?php _e('Save Changes') ?>" />
 		</p>
-	</form>
+
+<?php
+if ( get_option( 'tsa_spam_data_save' ) == "1" ) {
+// 日数
+$gdays = 30;
+// 表カラー
+$unique_color="#114477";
+$web_color="#3377B6";
+
+$results = $wpdb->get_results("SELECT SUBSTRING(post_date,1,10) AS spam_date,COUNT(*) as spam_count FROM `wp_tsa_spam` group by spam_date order by spam_date asc");
+?>
+<h3>スパム投稿３０日間の推移</h3>
+<?php
+		foreach ($results as $item) {
+			echo $item->spam_date .":". $item->spam_count."件<br />";
+        }
+?>
 	<div class="clear"></div>
+
+	<div class="clear" style="background-color:#efefef;">
+<table style="width:100%;border:none;"><tr>
+<?php
+$total_qry = "
+		SELECT count(ppd) as pageview, ppd
+		FROM (select ip_address, SUBSTRING(post_date,1,10) as ppd from $this->table_name) as A
+		GROUP BY ppd HAVING ppd >= '".gmdate('Y-m-d', current_time('timestamp')-86400*$gdays)."'
+		ORDER BY pageview DESC
+		LIMIT 1
+	";
+$qry = $wpdb->get_row($total_qry);
+$maxxday=$qry->pageview;
+
+$total_vis = "
+SELECT count(distinct ip_address) as vis, ppd
+FROM (select ip_address, SUBSTRING(post_date,1,10) as ppd from $this->table_name) as B
+GROUP BY ppd HAVING ppd >= '".gmdate('Y-m-d', current_time('timestamp')-86400*$gdays)."'
+ORDER BY vis DESC
+LIMIT 1
+	";
+$qry_vis = $wpdb->get_row($total_vis);
+$maxxday += $qry_vis->vis;
+
+if($maxxday == 0) { $maxxday = 1; }
+
+# Y
+$gd=(100/$gdays).'%';
+for($gg=$gdays-1;$gg>=0;$gg--)
+{
+#TOTAL VISITORS
+$visitor_qry = "
+		SELECT count(DISTINCT ip_address) AS total
+		FROM (select ip_address, SUBSTRING(post_date,1,10) as ppd from $this->table_name) as B
+		WHERE ppd = '".gmdate('Y-m-d', current_time('timestamp')-86400*$gg)."'
+		";
+$qry_visitors = $wpdb->get_row($visitor_qry);
+		$px_visitors = round($qry_visitors->total*100/$maxxday);
+		#TOTAL PAGEVIEWS (we do not delete the uniques, this is falsing the info.. uniques are not different visitors!)
+$pageview_qry = "
+SELECT count(ppd) as total
+FROM (select ip_address, SUBSTRING(post_date,1,10) as ppd from $this->table_name) as C
+WHERE ppd = '".gmdate('Y-m-d', current_time('timestamp')-86400*$gg)."'
+		";
+$qry_pageviews = $wpdb->get_row($pageview_qry);
+		$px_pageviews = round($qry_pageviews->total*100/$maxxday);
+		$px_white = 100 - $px_pageviews - $px_visitors;
+		if ($px_white < 0) { $px_white = 0; }
+
+		print '<td width="'.$gd.'" valign="bottom"';
+		if($start_of_week == gmdate('w',current_time('timestamp')-86400*$gg)) { print ' style="border-left:2px dotted gray;"'; }  # week-cut
+		print "><div style='float:left;width:100%;font-family:Helvetica;font-size:7pt;text-align:center;border-right:1px solid white;color:black;'>
+		<div style='background:#ffffff;width:100%;height:".$px_white."px;'></div>
+		<div style='background:$unique_color;width:100%;height:".$px_visitors."px;' title='".$qry_visitors->total." ip_addresses'></div>
+		<div style='background:$web_color;width:100%;height:".$px_pageviews."px;' title='".$qry_pageviews->total." spam comments'></div>
+		<div style='background:gray;width:100%;height:1px;'></div>
+		<br />".gmdate('d', current_time('timestamp')-86400*$gg) . ' ' . gmdate('M', current_time('timestamp')-86400*$gg) . "<br clear=\"all\" /></div></td>\n";
+}
+?>
+	</tr></table>
+	</div>
+&nbsp;<br />
+<div class="clear">
+<?php
+			// wp_tsa_spam の ip_address カラムに存在するIP_ADDRESS投稿は無視するか
+			$results = $wpdb->get_results(
+"SELECT count(ip_address) as cnt,ip_address FROM (select ip_address, SUBSTRING(post_date,1,10) as ppd from $this->table_name) as D
+WHERE ppd >= '".gmdate('Y-m-d', current_time('timestamp')-86400*$gdays)."'
+GROUP BY ip_address
+ORDER BY cnt DESC"
+);
+?><h4>過去３０日間に無視投稿されたIPアドレス</h4>
+<p>※「このIPアドレスを任意のブロック対象IPアドレスにコピーする」ボタンを押した場合は上の<b>「変更を保存」</b>をクリックし内容を保存してください。</p>
+<p>※IPアドレスをクリックすると特定のホストが存在するか確認し存在する場合は表示されます。</p>
+<?php if ( count( $results ) > 0 ) { ?>
+<div style="height: 500px; overflow:auto;"><blockquote>
+<table style="width:100%;border:1px #cccccc solid;border-collapse: collapse;"><?php
+			foreach ($results as $item) {
+				$spam_ip = $item->ip_address;
+				$spam_cnt = $item->cnt;
+				$p_url = WP_PLUGIN_URL.'/'.str_replace(basename( __FILE__),"",plugin_basename(__FILE__));
+?><tr style="border:1px #cccccc solid;border-collapse: collapse;"><td><b><a href="javascript:void(0);" onclick="window.open('<?php echo $p_url; ?>hostbyip.php?ip=<?php echo $spam_ip; ?>', 'hostbyip', 'width=350,height=250,scrollbars=no,location=no,menubar=no,toolbar=no,directories=no,status=no');"><?php echo $spam_ip; ?></a></b></td><td><?php echo $spam_cnt; ?>回</td><td>&nbsp;<input type="button" onclick="javascript:addIpAddresses('<?php echo $spam_ip; ?>');" value="このIPアドレスを任意のブロック対象IPアドレスにコピーする" /></td></tr><?php
+			}
+?></table></blockquote></div>
+<?php } ?>
 </div>
+<?php } ?>
+</form>
+<p>スパム投稿IPアドレスを参考にアクセス禁止対策を行なってください。</p>
+<div class="clear"></div>
+
+</div>
+
 	<?php
 	}
 
 	function trackback_spam_away($tb) {
 		global $newThrowsSpamAway;
 
-		$tsa_tb_on_flg = get_option('tsa_tb_on_flg');
-		$tsa_tb_url_flg = get_option('tsa_tb_url_flg');
+		$tsa_tb_on_flg = get_option( 'tsa_tb_on_flg' );
+		$tsa_tb_url_flg = get_option( 'tsa_tb_url_flg' );
 		$siteurl = get_option('siteurl');
 		// トラックバック OR ピンバック時にフィルタ発動
-		if ($tsa_tb_on_flg == "2" || ($tb['comment_type'] != 'trackback' && $tb['comment_type'] != 'pingback')) return $tb;
+		if ( $tsa_tb_on_flg == "2" || ( $tb['comment_type'] != 'trackback' && $tb['comment_type'] != 'pingback' ) ) return $tb;
 
 		// SPAMかどうかフラグ
 		$tb_val['is_spam'] = FALSE;
 
 		// コメント判定
-		$comment = $tb['comment_content'];
-
+		$comment = $tb["comment_author"] . $tb["comment_content"];
 		// IP系の検査
 		$ip = $_SERVER['REMOTE_ADDR'];
-		if (!$newThrowsSpamAway->ip_check($ip)) {
+		if ( !$newThrowsSpamAway->ip_check( $ip ) ) {
 			$tb_val['is_spam'] = TRUE;
 		} else
 		// 検査します！
-		if (!$newThrowsSpamAway->validation($comment)) {
+		if ( !$newThrowsSpamAway->validation( $comment ) ) {
 			$tb_val['is_spam'] = TRUE;
 		} else
 		// URL検索する場合、URL包含検査 （このブログのURLを含んでない場合エラー
-		if ($tsa_tb_url_flg == "1" && stripos($comment, $siteurl) == FALSE) {
+		if ( $tsa_tb_url_flg == "1" && stripos( $comment, $siteurl ) == FALSE ) {
 			$tb_val['is_spam'] = TRUE;	// スパム扱い
 		}
 		// トラックバックスパムがなければ返却・あったら捨てちゃう
-		if (!$tb_val['is_spam']) {
+		if ( !$tb_val['is_spam'] ) {
 			// トラックバック内に日本語存在（または禁止語句混入なし）
 			return $tb;
 		} else {
-			die('Your Trackback Throws Away.');
+			die( 'Your Trackback Throws Away.' );
 		}
 	}
 }
