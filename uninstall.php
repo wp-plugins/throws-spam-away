@@ -1,6 +1,7 @@
 <?php
 /*
 Throws SPAM Awayプラグインアンインストール
+2.3追加
 */
 
 if(!defined('ABSPATH') && !defined('WP_UNINSTALL_PLUGIN')) { exit(); }

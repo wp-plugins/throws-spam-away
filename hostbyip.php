@@ -1,4 +1,7 @@
 <?php
+/**
+ * ホスト検索
+ */
 $spam_ip = htmlspecialchars($_GET['ip']);
 ?>
 <!DOCTYPE html>
