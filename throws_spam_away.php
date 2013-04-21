@@ -4,7 +4,7 @@
  Plugin URI: http://gti.jp/tsa/
  Description: コメント内に日本語の記述が存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社ジーティーアイ　さとう　たけし
- Version: 2.3.2
+ Version: 2.3.3
  Author URI: http://gti.jp/
  */
 
@@ -81,17 +81,15 @@ add_action('pre_comment_on_post', array(&$newThrowsSpamAway, "comment_post"), 1)
 class ThrowsSpamAway {
 
     // version
-    var $version = '2.3';
-    var $table_name = "wp_tsa_spam";
+    var $version = '2.3.2';
+    var $table_name = "";
 
     public function __construct() {
     	global $default_spam_data_save;
         add_action( 'admin_menu', array( $this, 'admin_menu' ) );
-        if ( get_option('tsa_spam_data_save', $default_spam_data_save) != "1" ) {
-	        global $wpdb;
-	        // 接頭辞（wp_）を付けてテーブル名を設定
-	        $this->table_name = $wpdb->prefix . 'tsa_spam';
-        }
+        global $wpdb;
+        // 接頭辞（wp_）を付けてテーブル名を設定
+        $this->table_name = $wpdb->prefix . 'tsa_spam';
     }
 
     /**
