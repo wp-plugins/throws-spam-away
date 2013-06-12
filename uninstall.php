@@ -1,7 +1,8 @@
 <?php
 /*
 Throws SPAM Awayプラグインアンインストール
-2.3追加
+2.3 追加
+2.4 追記
 */
 
 if(!defined('ABSPATH') && !defined('WP_UNINSTALL_PLUGIN')) { exit(); }
@@ -29,4 +30,9 @@ delete_option('tsa_url_count_over_error_message');
 // ver.2.3
 delete_option('tsa_meta_version');
 delete_option('tsa_spam_data_save');
-?>
+// ver.2.4
+delete_option('tsa_spam_limit_flg');
+delete_option('tsa_spam_limit_minutes');
+delete_option('tsa_spam_limit_count');
+delete_option('tsa_spam_limit_over_interval');
+delete_option('tsa_spam_limit_over_interval_error_message');
