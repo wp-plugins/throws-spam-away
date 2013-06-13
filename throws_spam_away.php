@@ -9,8 +9,13 @@
  */
 require_once 'throws_spam_away.class.php';
 
+/**
+ * 設定値一覧
+ * デフォルト設定
+ */
+
 // スパムデータベースバージョン
-$tsa_db_version = 2.3;
+$tsa_db_version = 2.3;	// 2.4もデータベースバージョンは変更なし
 
 /** 初期設定 */
 // エラー種別
@@ -35,6 +40,15 @@ $default_url_count_over_error_msg = "";
 $default_url_count_check_flg = "1"; // 1:する
 // URL数の制限数
 $default_ok_url_count = 3;  // ３つまで許容
+
+// ○分以内に○回スパムとなったら○分間そのIPからのコメントははじくかの設定
+$default_spam_limit_flg = 2;	// 1:する Other:しない ※スパム情報保存がデフォルトではないのでこちらも基本はしない方向です。
+// ※スパム情報保存していないと機能しません。
+$default_spam_limit_minutes = 10;		// １０分以内に・・・
+$default_spam_limit_count = 2;			// ２回までは許そうか。
+$default_spam_limit_over_interval = 10;	// だがそれを超えたら（デフォルト３回目以降）10分はOKコメントでもスパム扱いするんでよろしく！
+$default_spam_limit_over_interval_error_msg = "";	// そしてその際のエラーメッセージは・・・
+
 /** オプションキー */
 // 日本語が存在しない時エラーとするかフラグ         [tsa_on_flg] 1:する 2:しない
 // 日本語文字列含有数 （入力値以下ならエラー）  [tsa_japanese_string_min_count] 数値型
@@ -63,6 +77,8 @@ $default_ok_url_count = 3;  // ３つまで許容
 // URL（単純に'http'文字列のチェックのみ）文字列の許容数                                    [tsa_ok_url_count] 数値型
 // URL（単純に'http'文字列のチェックのみ）文字列許容数オーバー時に表示される文言（元の記事に戻ってくる時間の間のみ表示）
 //                                                                                          [tsa_url_count_over_error_message] 文字列型
+
+
 
 /** プロセス */
 $newThrowsSpamAway = new ThrowsSpamAway;

@@ -5,7 +5,7 @@
  * @author Takeshi Satoh@GTI Inc. 2013
  */
 require_once 'throws_spam_away.class.php';
-require_once '../../../wp-load.php';
+require_once dirname( __FILE__ ).'/../../../wp-load.php';
 /**
  * ホスト検索
  */
