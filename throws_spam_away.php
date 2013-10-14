@@ -4,7 +4,7 @@
  Plugin URI: http://gti.jp/tsa/
  Description: コメント内に日本語の記述が存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社ジーティーアイ　さとう　たけし
- Version: 2.5
+ Version: 2.5.1
  Author URI: http://gti.jp/
  */
 require_once 'throws_spam_away.class.php';
@@ -24,6 +24,9 @@ $error_type = "";
 $default_japanese_string_min_count = 3;
 // コメント欄下に表示される注意文言（初期設定）
 $default_caution_msg = '日本語が含まれない投稿は無視されますのでご注意ください。（スパム対策）';
+// コメント欄下に表示する位置（初期設定）
+$default_caution_msg_point = "1";  //1:"comment_form", 2:"comment_form_after"
+
 // エラー時に表示されるエラー文言（初期設定）
 $default_error_msg = '日本語を規定文字数以上含まない記事は投稿できませんよ。';
 // 元画面に戻る時間
@@ -50,9 +53,7 @@ $default_spam_limit_over_interval = 10;	// だがそれを超えたら（デフ�
 $default_spam_limit_over_interval_error_msg = "";	// そしてその際のエラーメッセージは・・・
 
 // スパムデータ保持期間（日）
-$default_spam_keep_day_count = 30;
-// 最低保存期間（日）
-$lower_spam_keep_day_count = 7;
+$default_spam_keep_day_count = 60;
 
 // スパムちゃんぷるーホスト
 $spam_champuru_host = "dnsbl.spam-champuru.livedoor.com";
@@ -62,6 +63,7 @@ $spam_champuru_host = "dnsbl.spam-champuru.livedoor.com";
 // 日本語文字列含有数 （入力値以下ならエラー）  [tsa_japanese_string_min_count] 数値型
 // 元の記事に戻ってくる時間（秒）                               [tsa_back_second] 数値型
 // コメント欄の下に表示される注意文言                       [tsa_caution_message] 文字列型
+// コメント欄の下に表示される注意文言の位置                  [tsa_caution_message_point] 文字列型（"1" or "2"）
 // 日本語文字列規定値未満エラー時に表示される文言（元の記事に戻ってくる時間の間のみ表示）
 //                                                                                          [tsa_error_message] 文字列型
 // その他NGキーワード（日本語でも英語（その他）でもNGとしたいキーワードを半角カンマ区切りで複数設定できます。挙動は同じです。NGキーワードだけでも使用できます。）
@@ -92,6 +94,14 @@ $spam_champuru_host = "dnsbl.spam-champuru.livedoor.com";
 $newThrowsSpamAway = new ThrowsSpamAway;
 // トラックバックチェックフィルター
 add_filter('preprocess_comment', array(&$newThrowsSpamAway, 'trackback_spam_away'), 1, 1);
+// 注意文言表示
 // コメントフォーム表示
-add_action('comment_form_after', array(&$newThrowsSpamAway, "comment_form"), 9999); // Ver.2.1.1 comment_form → comment_form_after
+$comment_disp_point = "comment_form";
+$comment_form_action_point = get_option("tsa_caution_msg_point", $default_caution_msg_point);
+// フォーム内かフォーム外か判断する
+if ("2" == $comment_form_action_point) {
+    $comment_disp_point = "comment_form_after";
+}
+add_action($comment_disp_point, array(&$newThrowsSpamAway, "comment_form"), 9999);
+// コメントチェックフィルター
 add_action('pre_comment_on_post', array(&$newThrowsSpamAway, "comment_post"), 1);
