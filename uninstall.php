@@ -36,3 +36,10 @@ delete_option('tsa_spam_limit_minutes');
 delete_option('tsa_spam_limit_count');
 delete_option('tsa_spam_limit_over_interval');
 delete_option('tsa_spam_limit_over_interval_error_message');
+// ver.2.5
+delete_option('tsa_spam_champuru_flg');
+delete_option('tsa_spam_keep_day_count');
+delete_option('tsa_spam_data_delete_flg');
+delete_option('tsa_white_ip_addresses');
+// ver.2.5.1
+delete_option('tsa_caution_msg_point');

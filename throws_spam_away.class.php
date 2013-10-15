@@ -9,17 +9,29 @@
 class ThrowsSpamAway {
 
 	// version
-	var $version = '2.4';
+	var $version = '2.5.2.1';
 	var $table_name = "";
 
 	public function __construct($flg = FALSE) {
 		global $default_spam_data_save;
-		if ($flg == FALSE) {
-			add_action( 'admin_menu', array( $this, 'admin_menu' ) );
-		}
 		global $wpdb;
 		// 接頭辞（wp_）を付けてテーブル名を設定
 		$this->table_name = $wpdb->prefix . 'tsa_spam';
+		if ($flg == FALSE) {
+			add_action( 'admin_menu', array( $this, 'admin_menu' ) );
+			global $default_spam_keep_day_count;
+			global $lower_spam_keep_day_count;
+
+			// 保存期間終了したデータ削除
+			$skdc = intval( get_option('tsa_spam_keep_day_count', $default_spam_keep_day_count) );
+			if ( $skdc < $lower_spam_keep_day_count ) { $skdc = $lower_spam_keep_day_count; }
+			if ( get_option('tsa_spam_data_delete_flg', "") == "1" ) {
+				// 期間 get_option('tsa_spam_keep_day_count') 日
+				$wpdb->query(
+						"DELETE FROM ".$this->table_name." WHERE post_date < '".gmdate('Y-m-d 23:59:59', current_time('timestamp')-86400 * $skdc)."'"
+				);
+			}
+		}
 	}
 
 	/**
@@ -65,6 +77,8 @@ class ThrowsSpamAway {
 	 * @param string $ip_address
 	 */
 	function save_post_meta( $post_id, $ip_address ) {
+		global $default_spam_data_save;
+
 		if ( get_option('tsa_spam_data_save', $default_spam_data_save) != "1" )  return;
 
 		global $wpdb;
@@ -85,7 +99,10 @@ class ThrowsSpamAway {
 		global $default_caution_msg;
 		// 注意文言表示
 		$caution_msg = get_option( 'tsa_caution_message', $default_caution_msg );
-		echo '<div id="throwsSpamAway">'.$caution_msg.'</div>';
+		// 注意文言が設定されている場合のみ表示する
+		if ( strlen( trim( $caution_msg ) ) > 0 ) {
+			echo '<p id="throwsSpamAway">'.$caution_msg.'</p>';    // div から p タグへ変更
+		}
 		return TRUE;
 	}
 
@@ -101,14 +118,38 @@ class ThrowsSpamAway {
 		global $default_spam_limit_over_interval_error_msg;
 		global $error_type;
 
+		// ログインしている場合は通過させます。
 		if( $user_ID ) {
 			return $id;
 		}
 		// コメント（comment）及び名前（author）の中も検査
 		$author = $_POST["author"];
 		$comment = $_POST["comment"];
-		// IP系の検査
+
+		// チェック対象IPアドレス
 		$ip = $_SERVER['REMOTE_ADDR'];
+
+		// ホワイトリスト優先通過
+		// IP制御 任意のIPアドレスをあればブロックする
+		$white_ip_addresses = get_option( 'tsa_white_ip_addresses', "" );
+		if ( $white_ip_addresses != NULL && $white_ip_addresses != "" ) {
+			// 改行区切りの場合はカンマ区切りに文字列置換後リスト化
+			$white_ip_addresses = str_replace("\n", ",", $white_ip_addresses);
+			$ip_list = mb_split( ",", $white_ip_addresses );
+			foreach ( $ip_list as $_ip ) {
+				// 指定IPが範囲指定の場合 例：192.168.1.0/24
+				if ( strpos( $_ip, "/" ) != FALSE ) {
+					if ( $this->inCIDR( $ip, $_ip ) ) {
+						// 通過対象
+						return $id;
+					}
+				} elseif ( trim( $_ip ) == trim( $ip ) ) {
+					// 通過対象
+					return $id;
+				}
+			}
+		}
+		// IP系の検査
 		if ( !$newThrowsSpamAway->ip_check( $ip ) ) {
 			// アウト！
 		} else
@@ -157,6 +198,14 @@ class ThrowsSpamAway {
 		global $wpdb; // WordPress DBアクセス
 		global $newThrowsSpamAway;
 		global $error_type;
+		// スパムフィルター利用あれば始めに通す
+		// １．スパムちゃんぷるー
+		$spam_filter_spam_champuru_flg = get_option( 'tsa_spam_champuru_flg' );
+		if ( get_option( 'tsa_spam_champuru_flg', "" ) == "1" ) {
+			return $this->rejectSpamIP( $target_ip );
+		}
+		// ２．以降あれば追加
+
 		// IP制御 WordPressのスパムチェックにてスパム扱いしている投稿のIPをブロックするか
 		$ip_block_from_spam_chk_flg = get_option( 'tsa_ip_block_from_spam_chk_flg' );
 
@@ -193,6 +242,49 @@ class ThrowsSpamAway {
 					// セーフIP
 				}
 			}
+		}
+		return TRUE;
+	}
+
+	/**
+	 * スパムちゃんぷるー利用ブロック
+	 */
+	function rejectSpamIP( $ip ) {
+		global $spam_champuru_host;
+
+		$spam_IP  = '127.0.0.2';
+		$host     = $spam_champuru_host;
+		$pattern  = '/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/';
+		$check_IP = trim(preg_match($pattern, $ip) ? $ip : $_SERVER['REMOTE_ADDR']);
+		$spam     = false;
+		if (preg_match($pattern, $check_IP)) {
+			$host = implode('.',array_reverse(split('\.',$check_IP))) . '.' . $host;
+			if (function_exists('dns_get_record')) {
+				$check_recs = dns_get_record($host, DNS_A);
+				if (isset($check_recs[0]['ip'])) $spam = ($check_recs[0]['ip'] === $spam_IP);
+				unset($check_recs);
+			} elseif (function_exists('gethostbyname')) {
+				$checked = (gethostbyname($host) === $spam_IP);
+			} elseif (class_exists('Net_DNS_Resolver')) {
+				$resolver = new Net_DNS_Resolver();
+				$response = $resolver->query($host, 'A');
+				if ($response) {
+					foreach ($response->answer as $rr) {
+						if ($rr->type === 'A') {
+							$spam = ($rr->address === $spam_IP);
+							break;
+						}
+					}
+				}
+				unset($response);
+				unset($resolver);
+			} elseif (function_exists('checkdnsrr')) {
+				$spam = (checkdnsrr($host, "A") === true);
+			}
+		}
+		if ($spam) {
+			$error_type = "block_ip";
+			return FALSE;
 		}
 		return TRUE;
 	}
@@ -378,6 +470,7 @@ class ThrowsSpamAway {
 		global $wpdb; // WordPress DBアクセス
 		global $default_japanese_string_min_count;
 		global $default_caution_msg;
+		global $default_caution_msg_point;
 		global $default_back_second;
 		global $default_error_msg;
 		global $default_ng_key_error_msg;
@@ -392,8 +485,25 @@ class ThrowsSpamAway {
 		global $default_spam_limit_over_interval;
 		global $default_spam_limit_over_interval_error_msg;
 
+		global $default_spam_display_day_count;
+
+		global $default_spam_keep_day_count;
+
 		// 設定完了の場合はメッセージ表示
 		$_saved = FALSE;
+		// スパム情報から 特定IPアドレス削除
+		if ( $_POST['act'] != NULL && $_POST['act'] == "remove_ip" ) {
+			$remove_ip_address = @htmlspecialchars($_POST['ip_address']);
+			if ( !isset($remove_ip_address) || strlen($remove_ip_address) == 0 ) {
+				// N/A
+			} else {
+				// スパムデータベースから特定IP情報削除
+				$wpdb->query(
+					"DELETE FROM ".$this->table_name." WHERE ip_address = '".$remove_ip_address."' "
+				);
+				$_saved = TRUE;
+			}
+		}
 		if ( $_GET['settings-updated'] == "true" ) {
 			$_saved = TRUE;
 		}
@@ -458,6 +568,14 @@ function addIpAddresses(newAddressStr) {
     }
 	return false;
 }
+function removeIpAddressOnData(ipAddressStr) {
+	if (confirm('['+ipAddressStr+'] をスパムデータベースから削除します。よろしいですか？この操作は取り消せません')) {
+		jQuery('#remove_ip_address').val(ipAddressStr);
+		jQuery('#remove').submit();
+	} else {
+		return false;
+	}
+}
 </script>
 <div class="wrap">
 	<h2>Throws SPAM Away設定</h2>
@@ -469,7 +587,7 @@ function addIpAddresses(newAddressStr) {
 		<?php wp_nonce_field('update-options'); ?>
 		<table class="form-table">
 			<tr valign="top">
-				<th scope="row">日本語が存在しない場合、無視対象とする<br />（日本語文字列が存在しない場合無視対象となります。）
+				<th scope="row" >日本語が存在しない場合、無視対象とする<br />（日本語文字列が存在しない場合無視対象となります。）
 				</th>
 				<td><?php
 				$chk_1 = "";
@@ -499,13 +617,30 @@ function addIpAddresses(newAddressStr) {
 				</td>
 			</tr>
 			<tr valign="top">
-				<th scope="row">コメント欄の下に表示される注意文言</th>
+				<th scope="row" id="tsa_caution_message">コメント欄の下に表示される注意文言</th>
 				<td><input type="text" name="tsa_caution_message" size="80"
 					value="<?php echo get_option('tsa_caution_message', $default_caution_msg);?>" /><br />（初期設定:<?php echo $default_caution_msg;?>）</td>
 			</tr>
 			<tr valign="top">
-				<th scope="row">日本語文字列規定値未満エラー時に表示される文言<br />（元の記事に戻ってくる時間の間のみ表示）
-				</th>
+				<th scope="row" id="tsa_caution_msg_point">コメント注意文言の表示位置</th>
+				<td><?php
+				$chk_1 = "";
+				$chk_2 = "";
+				if (get_option('tsa_caution_msg_point', $default_caution_msg_point) == "2") {
+                    $chk_2 = " checked=\"checked\"";
+                } else {
+                    $chk_1 = " checked=\"checked\"";
+                }
+                ?> <label><input type="radio"
+						name="tsa_caution_msg_point" value="1" <?php echo $chk_1;?> />&nbsp;コメント送信ボタンの上</label>&nbsp;
+					<label><input type="radio" name="tsa_caution_msg_point" value="2"
+					<?php echo $chk_2;?> />&nbsp;コメント送信フォームの下</label>
+				</td>
+			</tr>
+			<tr><td colspan="2">※表示が崩れる場合、<a href="#tsa_caution_msg_point">「コメント注意文言の表示位置」</a>の変更　や　<a href="#tsa_caution_message">「コメント欄の下に表示される注意文言」</a>を空白にすること　を試してみて下さい。<br />
+			「コメント欄の下に表示される注意文言」が空白の場合は文言表示のタグ自体が挿入されないようになります。</td></tr>
+			<tr valign="top">
+				<th scope="row">日本語文字列規定値未満エラー時に表示される文言<br />（元の記事に戻ってくる時間の間のみ表示）</th>
 				<td><input type="text" name="tsa_error_message" size="80"
 					value="<?php echo get_option('tsa_error_message', $default_error_msg);?>" /><br />（初期設定:<?php echo $default_error_msg;?>）</td>
 			</tr>
@@ -601,6 +736,17 @@ function addIpAddresses(newAddressStr) {
 		<h3>投稿IPアドレスによる制御設定</h3>
 		<table class="form-table">
 			<tr valign="top">
+				<th scope="row">SPAMブラックリスト利用</th>
+				<td><?php
+				$chk = "";
+				if (get_option('tsa_spam_champuru_flg', "") == "1" ) {
+					$chk = "checked=\"checked\"";
+				}
+				?>
+					<label><input type="checkbox" name="tsa_spam_champuru_flg" value="1" <?php echo $chk; ?> /><a href="http://spam-champuru.livedoor.com/dnsbl/">スパムちゃんぷるーDNSBL</a>に登録されているIPアドレスからのコメントを拒否する</label>
+				</td>
+			</tr>
+			<tr valign="top">
 				<th scope="row">WordPressのコメントで「スパム」にしたIPからの投稿にも採用する</th>
 				<td><?php
 				$chk = "";
@@ -609,7 +755,7 @@ function addIpAddresses(newAddressStr) {
                 }
                 ?> <label><input type="checkbox"
 						name="tsa_ip_block_from_spam_chk_flg" value="1"
-						<?php echo $chk; ?> />&nbsp;スパム投稿設定したIPアドレスからの投稿も無視する</label><br />
+						<?php echo $chk; ?> />&nbsp;スパム投稿設定したIPアドレスからの投稿も無視する</label>&nbsp;※Akismet等で自動的にスパムマークされたものも含む<br />
 					<?php
 					// wp_commentsの　comment_approved　カラムが「spam」のIP_ADDRESSからの投稿は無視する
 					$results = $wpdb->get_results("SELECT DISTINCT comment_author_IP FROM  $wpdb->comments WHERE comment_approved =  'spam' ORDER BY comment_author_IP ASC ");
@@ -648,6 +794,16 @@ function addIpAddresses(newAddressStr) {
 					size="80"
 					value="<?php echo get_option('tsa_block_ip_address_error_message', $default_block_ip_address_error_msg);?>" /><br />（初期設定：<?php echo $default_block_ip_address_error_msg; ?>）</td>
 			</tr>
+
+			<tr style="background-color: #efefef;"><td colspan="2"><hr />※上記のスパムチェックから除外するIPアドレスがあれば下記に設定してください。優先的に通過させます。<br />※トラックバックは優先通過ではありません。</td></tr>
+			<tr style="background-color: #efefef;" valign="top">
+				<th scope="row"><strong>IP制御免除<br />ホワイトリスト</strong><br />※ここに登録したIPアドレスはスパムフィルタを掛けず優先的に通します。<br />※日本語以外の言語でご利用になられるお客様のIPアドレスを登録するなどご利用ください。<br />改行区切りで複数設定できます。範囲指定も可能です。（半角数字とスラッシュ、ドットのみ）</th>
+				<td>
+					<textarea name="tsa_white_ip_addresses"
+						id="tsa_white_ip_addresses" cols="80" rows="10"><?php echo get_option('tsa_white_ip_addresses', "");?></textarea>
+				</td>
+			</tr>
+
 		</table>
 		<h3>スパムデータベース</h3>
 		<table class="form-table">
@@ -660,7 +816,24 @@ function addIpAddresses(newAddressStr) {
                 }
                 ?> <label><input type="checkbox"
 						name="tsa_spam_data_save" value="1" <?php echo $chk; ?> />&nbsp;スパムコメント情報を保存する</label><br />※Throws
-					SPAM Away設定画面表示時に時間がかかることがあります。<br />※「保存する」を解除した場合でもテーブルは残りますので３０日以内の取得データは表示されます。
+					SPAM Away設定画面表示時に時間がかかることがあります。<br />※「保存する」を解除した場合でもテーブルは残りますので<?php echo get_option('tsa_spam_keep_day_count', $default_spam_keep_day_count); ?>日以内の取得データは表示されます。
+				</td>
+			</tr>
+			<tr>
+				<th scope="row">スパムデータを表示する期間</th>
+				<td>
+					<input
+					type="text" name="tsa_spam_keep_day_count" size="3"
+					value="<?php echo get_option('tsa_spam_keep_day_count', $default_spam_keep_day_count); ?>" />日分（最低７日）&nbsp;
+					<?php
+						$chk = "";
+						if (get_option('tsa_spam_data_delete_flg', "") == "1") {
+							$chk = "checked=\"checked\"";
+						}
+					?>
+					<label><input type="checkbox" name="tsa_spam_data_delete_flg" value="1"
+				<?php echo $chk; ?> />&nbsp;期間が過ぎたデータを削除する</label><br />
+				※一度消したデータは復活出来ませんのでご注意ください。また最低７日分は保存されます。
 				</td>
 			</tr>
 			<tr valign="top">
@@ -693,7 +866,7 @@ function addIpAddresses(newAddressStr) {
 
 		<input type="hidden" name="action" value="update" /> <input
 			type="hidden" name="page_options"
-			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_second,tsa_caution_message,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_must_keywords,tsa_must_key_error_message,tsa_tb_on_flg,tsa_tb_url_flg,tsa_block_ip_addresses,tsa_ip_block_from_spam_chk_flg,tsa_block_ip_address_error_message,tsa_url_count_on_flg,tsa_ok_url_count,tsa_url_count_over_error_message,tsa_spam_data_save,tsa_spam_limit_flg,tsa_spam_limit_minutes,tsa_spam_limit_count,tsa_spam_limit_over_interval,tsa_spam_limit_over_interval_error_message" />
+			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_second,tsa_caution_message,tsa_caution_msg_point,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_must_keywords,tsa_must_key_error_message,tsa_tb_on_flg,tsa_tb_url_flg,tsa_block_ip_addresses,tsa_ip_block_from_spam_chk_flg,tsa_block_ip_address_error_message,tsa_url_count_on_flg,tsa_ok_url_count,tsa_url_count_over_error_message,tsa_spam_data_save,tsa_spam_limit_flg,tsa_spam_limit_minutes,tsa_spam_limit_count,tsa_spam_limit_over_interval,tsa_spam_limit_over_interval_error_message,tsa_spam_champuru_flg,tsa_spam_keep_day_count,tsa_spam_data_delete_flg,tsa_white_ip_addresses" />
 		<p class="submit">
 			<input type="submit" class="button-primary"
 				value="<?php _e('Save Changes') ?>" />
@@ -702,15 +875,15 @@ function addIpAddresses(newAddressStr) {
 		<?php
 		if ( get_option( 'tsa_spam_data_save' ) == "1" ) {
 // 日数
-$gdays = 30;
+$gdays = get_option( 'tsa_spam_keep_day_count', $default_spam_keep_day_count);
+if ( $gdays < $lower_spam_keep_day_count ) { $gdays = $lower_spam_keep_day_count; }
 // 表カラー
 $unique_color="#114477";
 $web_color="#3377B6";
 ?>
-		<h3>スパム投稿３０日間の推移</h3>
-		<div class="clear"></div>
+		<h3>スパム投稿<?php echo $gdays; ?>日間の推移</h3>
 
-		<div class="clear" style="background-color: #efefef;">
+		<div style="background-color: #efefef;">
 			<table style="width: 100%; border: none;">
 				<tr>
 					<?php
@@ -782,11 +955,11 @@ print "><div style='float:left;width:100%;font-family:Helvetica;font-size:7pt;te
 		</div>
 		&nbsp;※&nbsp;数値は
 		&lt;上段&gt;がSPAM投稿したユニークIPアドレス数、&nbsp;&lt;下段&gt;が破棄したスパム投稿数<br />
-		<div class="clear">
+		<div>
 <?php
 			// wp_tsa_spam の ip_address カラムに存在するIP_ADDRESS投稿は無視するか
 			$results = $wpdb->get_results(
-"SELECT count(ip_address) as cnt,ip_address,max(ppd) as post_date FROM (select ip_address, SUBSTRING(post_date,1,10) as ppd from $this->table_name) as D
+"SELECT count(ip_address) as cnt,ip_address,max(ppd) as post_date FROM (select ip_address, post_date as ppd from $this->table_name) as D
 WHERE ppd >= '". gmdate( 'Y-m-d', current_time( 'timestamp' ) - 86400 * $gdays )."'
 GROUP BY ip_address
 ORDER BY cnt DESC"
@@ -801,6 +974,7 @@ ORDER BY cnt DESC"
 				※「このIPアドレスを任意のブロック対象IPアドレスにコピーする」ボタンを押した場合は上の<b>「変更を保存」</b>をクリックし内容を保存してください。
 			</p>
 			<p>※IPアドレスをクリックすると特定のホストが存在するか確認し存在する場合は表示されます。</p>
+			<p>「スパムデータから削除する」ボタンを押しますと該当IPアドレスのスパム投稿データが削除されます。テストしたあとの削除などに使用してください。</p>
 			<?php if ( count( $results ) > 0 ) {
 				$p_url = WP_PLUGIN_URL.'/'.str_replace(basename( __FILE__),"",plugin_basename(__FILE__));
 				wp_enqueue_script("jquery.tablesorter", $p_url."js/jquery.tablesorter.min.js", array('jquery'), FALSE);
@@ -949,10 +1123,11 @@ jQuery(function() {
 	jQuery('#spam_list').tablesorter({
 		  widgets: ['zebra'],
 		  headers: {
-			0: {id:"ipAddress"},
-			3: {sorter:false},
-			2: { sorter: "shortDate" }
-		  }
+			0: { id: "ipAddress" },
+			1: { sorter: "digit" },
+			2: { sorter: "shortDate" },
+			3: { sorter: false }
+			}
 		});
 
 	});
@@ -969,7 +1144,7 @@ jQuery(function() {
 					<tr>
 						<th class="cols0">IPアドレス</th>
 						<th class="cols1">投稿数</th>
-						<th class="cols2">最終投稿日</th>
+						<th class="cols2">最終投稿日時</th>
 						<th class="cols3">スパムIP登録</th>
 					</tr>
 				</thead>
@@ -983,31 +1158,36 @@ jQuery(function() {
 					<tr>
 						<td>
 							<b><a href="javascript:void(0);"
-									onclick="window.open('<?php echo $p_url; ?>hostbyip.php?ip=<?php echo $spam_ip; ?>', 'hostbyip', 'width=350,height=250,scrollbars=no,location=no,menubar=no,toolbar=no,directories=no,status=no');"><?php echo $spam_ip; ?>
-							</a></b>
+									onclick="window.open('<?php echo $p_url; ?>hostbyip.php?ip=<?php echo $spam_ip; ?>', 'hostbyip', 'width=350,height=300,scrollbars=no,location=no,menubar=no,toolbar=no,directories=no,status=no');"><?php echo $spam_ip; ?>
+							</a></b><br clear="all" />
+							<input type="button"
+							onclick="javascript:removeIpAddressOnData('<?php echo $spam_ip; ?>');"
+							value="スパムデータから削除する" />
 						</td>
 						<td><?php echo $spam_cnt; ?>回</td>
 						<td><?php echo $last_post_date; ?></td>
-						<td>&nbsp;<input type="button"
+						<td><input type="button"
 							onclick="javascript:addIpAddresses('<?php echo $spam_ip; ?>');"
-							value="このIPアドレスを任意のブロック対象IPアドレスにコピーする" /></td>
+							value="ブロック対象IPアドレスにコピー[<?php echo $spam_ip; ?>]" /></td>
 					</tr>
 <?php
 	}
 ?>
 				</tbody>
 			</table>
-<?php } ?>
 		</div>
 	</div>
-</div>
+<?php } ?>
 <?php } ?>
 	</form>
+	<form method="post" id="remove">
+		<input type="hidden" name="ip_address" id="remove_ip_address" value="" />
+		<input type="hidden" name="act" value="remove_ip" />
+	</form>
 	<p>スパム投稿IPアドレスを参考にアクセス禁止対策を行なってください。</p>
-	<div class="clear"></div>
 
 </div>
-
+<br clear="all" />
 <?php
 	}
 
@@ -1067,4 +1247,5 @@ jQuery(function() {
 		}
 		return NULL;
 	}
+
 }
