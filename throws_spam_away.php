@@ -4,7 +4,7 @@
  Plugin URI: http://gti.jp/tsa/
  Description: コメント内に日本語の記述が存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社ジーティーアイ　さとう　たけし
- Version: 2.5.1
+ Version: 2.5.2
  Author URI: http://gti.jp/
  */
 require_once 'throws_spam_away.class.php';
@@ -53,7 +53,9 @@ $default_spam_limit_over_interval = 10;	// だがそれを超えたら（デフ�
 $default_spam_limit_over_interval_error_msg = "";	// そしてその際のエラーメッセージは・・・
 
 // スパムデータ保持期間（日）
-$default_spam_keep_day_count = 60;
+$default_spam_keep_day_count = 30;
+// 最低保存期間（日）
+$lower_spam_keep_day_count = 7;
 
 // スパムちゃんぷるーホスト
 $spam_champuru_host = "dnsbl.spam-champuru.livedoor.com";
