@@ -4,7 +4,7 @@
  Plugin URI: http://gti.jp/tsa/
  Description: コメント内に日本語の記述が存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社ジーティーアイ　さとう　たけし
- Version: 2.5.2
+ Version: 2.5.2.1
  Author URI: http://gti.jp/
  */
 require_once 'throws_spam_away.class.php';

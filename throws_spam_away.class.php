@@ -9,7 +9,7 @@
 class ThrowsSpamAway {
 
 	// version
-	var $version = '2.5.2';
+	var $version = '2.5.2.1';
 	var $table_name = "";
 
 	public function __construct($flg = FALSE) {
@@ -882,7 +882,6 @@ $unique_color="#114477";
 $web_color="#3377B6";
 ?>
 		<h3>スパム投稿<?php echo $gdays; ?>日間の推移</h3>
-		<div class="clear"></div>
 
 		<div style="background-color: #efefef;">
 			<table style="width: 100%; border: none;">
@@ -1176,10 +1175,9 @@ jQuery(function() {
 ?>
 				</tbody>
 			</table>
-<?php } ?>
 		</div>
 	</div>
-</div>
+<?php } ?>
 <?php } ?>
 	</form>
 	<form method="post" id="remove">
