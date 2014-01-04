@@ -16,8 +16,8 @@ $last_spam_comment_result = $newThrowsSpamAway->get_last_spam_comment($spam_ip);
 $last_comment_date = $last_spam_comment_result->post_date;
 $last_comment_post = get_permalink($last_spam_comment_result->post_id);
 $last_comment_post_title = get_the_title(get_post($last_spam_comment_result->post_id));
-?>
-<!DOCTYPE html>
+$is_spam_champuru = ( $newThrowsSpamAway->rejectSpamIP($spam_ip) ? FALSE : TRUE );
+?><!DOCTYPE html>
 <!--[if IE 8]>
 <html xmlns="http://www.w3.org/1999/xhtml" class="ie8 wp-toolbar"  lang="ja" prefix="og: http://ogp.me/ns#" >
 <![endif]-->
@@ -56,6 +56,7 @@ Whois: <a href="http://whois.arin.net/rest/ip/<?php echo $spam_ip; ?>" target="_
 <div style="background: #999;color: #fff;margin:3px 0 0 0;">このIPからの最終投稿日時</div><?php echo $last_comment_date; ?><br />
 <div style="background: #999;color: #fff;margin:3px 0 0 0;">このIPからスパム投稿対象となったページ</div><a href="<?php echo $last_comment_post; ?>" target="_blank"><?php echo $last_comment_post_title; ?></a><br />
 <?php } ?>
+<h4>スパムフィルター：<?php echo ($is_spam_champuru ? "スパムちゃんぷるー存在IPアドレス" : "未検出" ); ?></h4>
 <div style="text-align:right;"><a href="javascript:void(0);" onclick="window.close();">閉じる</a></div>
 </div>
 </body>
