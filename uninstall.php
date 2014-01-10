@@ -3,6 +3,7 @@
 Throws SPAM Awayプラグインアンインストール
 2.3 追加
 2.4 追記
+2.6 追記
 */
 
 if(!defined('ABSPATH') && !defined('WP_UNINSTALL_PLUGIN')) { exit(); }
@@ -43,3 +44,6 @@ delete_option('tsa_spam_data_delete_flg');
 delete_option('tsa_white_ip_addresses');
 // ver.2.5.1
 delete_option('tsa_caution_msg_point');
+// ver.2.6
+delete_option('tsa_empty_param_field_flg');
+delete_option('tsa_memo');

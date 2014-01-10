@@ -4,7 +4,7 @@
  Plugin URI: http://gti.jp/tsa/
  Description: コメント内に日本語の記述が存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社ジーティーアイ　さとう　たけし
- Version: 2.5.2.1
+ Version: 2.6
  Author URI: http://gti.jp/
  */
 require_once 'throws_spam_away.class.php';
@@ -14,12 +14,16 @@ require_once 'throws_spam_away.class.php';
  * デフォルト設定
  */
 
+// Throws SPAM Awayバージョン
+$tsa_version = "2.6";
 // スパムデータベースバージョン
-$tsa_db_version = 2.3;	// 2.4もデータベースバージョンは変更なし
+$tsa_db_version = 2.6;	// 2.6からデータベース変更 [error_type]追加
 
 /** 初期設定 */
 // エラー種別
 $error_type = "";
+// ダミー項目でのスパム判定をするか
+$default_dummy_param_field_flg = "1";	// 1: する 2:しない
 // 日本語文字最小含有数
 $default_japanese_string_min_count = 3;
 // コメント欄下に表示される注意文言（初期設定）
@@ -61,6 +65,7 @@ $lower_spam_keep_day_count = 7;
 $spam_champuru_host = "dnsbl.spam-champuru.livedoor.com";
 
 /** オプションキー */
+// ダミーフィールドを生成しそこに入力がある場合はエラーとするかフラグ [tsa_dummy_param_field_flg] 1:する 2:しない
 // 日本語が存在しない時エラーとするかフラグ         [tsa_on_flg] 1:する 2:しない
 // 日本語文字列含有数 （入力値以下ならエラー）  [tsa_japanese_string_min_count] 数値型
 // 元の記事に戻ってくる時間（秒）                               [tsa_back_second] 数値型
@@ -96,6 +101,12 @@ $spam_champuru_host = "dnsbl.spam-champuru.livedoor.com";
 $newThrowsSpamAway = new ThrowsSpamAway;
 // トラックバックチェックフィルター
 add_filter('preprocess_comment', array(&$newThrowsSpamAway, 'trackback_spam_away'), 1, 1);
+// ダミーフィールド作成
+$dummy_param_field_flg = get_option("tsa_dummy_param_field_flg", $default_dummy_param_field_flg );
+if ( "1" == $dummy_param_field_flg ) {
+	add_action('init', array(&$newThrowsSpamAway, "tsa_scripts_init" ), 9997);
+	add_action( "comment_form", array(&$newThrowsSpamAway, "comment_form_dummy_param_field" ), 9998);
+}
 // 注意文言表示
 // コメントフォーム表示
 $comment_disp_point = "comment_form";
