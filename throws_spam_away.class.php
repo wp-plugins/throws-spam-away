@@ -12,25 +12,25 @@ class ThrowsSpamAway {
 	var $version = '2.6';
 	var $table_name = "";
 
-	public function __construct($flg = FALSE) {
+	public function __construct() {
 		global $default_spam_data_save;
 		global $wpdb;
 		// 接頭辞（wp_）を付けてテーブル名を設定
 		$this->table_name = $wpdb->prefix . 'tsa_spam';
-		if ($flg == FALSE) {
-			add_action( 'admin_menu', array( $this, 'admin_menu' ) );
-			global $default_spam_keep_day_count;
-			global $lower_spam_keep_day_count;
 
-			// 保存期間終了したデータ削除
-			$skdc = intval( get_option('tsa_spam_keep_day_count', $default_spam_keep_day_count) );
-			if ( $skdc < $lower_spam_keep_day_count ) { $skdc = $lower_spam_keep_day_count; }
-			if ( get_option('tsa_spam_data_delete_flg', "") == "1" ) {
-				// 期間 get_option('tsa_spam_keep_day_count') 日
-				$wpdb->query(
-						"DELETE FROM ".$this->table_name." WHERE post_date < '".gmdate('Y-m-d 23:59:59', current_time('timestamp')-86400 * $skdc)."'"
-				);
-			}
+		add_action( 'admin_menu', array( $this, 'admin_menu' ) );
+
+		global $default_spam_keep_day_count;
+		global $lower_spam_keep_day_count;
+
+		// 保存期間終了したデータ削除
+		$skdc = intval( get_option('tsa_spam_keep_day_count', $default_spam_keep_day_count) );
+		if ( $skdc < $lower_spam_keep_day_count ) { $skdc = $lower_spam_keep_day_count; }
+		if ( get_option('tsa_spam_data_delete_flg', "") == "1" ) {
+			// 期間 get_option('tsa_spam_keep_day_count') 日
+			$wpdb->query(
+					"DELETE FROM ".$this->table_name." WHERE post_date < '".gmdate('Y-m-d 23:59:59', current_time('timestamp')-86400 * $skdc)."'"
+			);
 		}
 	}
 
@@ -87,8 +87,8 @@ class ThrowsSpamAway {
 		global $wpdb;
 
 		$error_type = $spam_contents['error_type'];
-		$author = $spam_contents['author'];
-		$comment = $spam_contents['comment'];
+		$author = strip_tags($spam_contents['author']);
+		$comment = strip_tags($spam_contents['comment']);
 
 		//保存するために配列にする
 		$set_arr = array(
@@ -291,6 +291,7 @@ class ThrowsSpamAway {
 	 */
 	function rejectSpamIP( $ip ) {
 		global $spam_champuru_host;
+		global $error_type;
 
 		$spam_IP  = '127.0.0.2';
 		$host     = $spam_champuru_host;
@@ -502,8 +503,16 @@ class ThrowsSpamAway {
 	 */
 	function admin_menu() {
 		$mincap="level_8";
-		add_menu_page(__( 'Throws SPAM Away', $this->domain ), __( 'Throws SPAM Away', $this->domain ), $mincap, __FILE__, array( $this, 'options_page' ) );
+		$spam_mincap = "level_7";
+		if (function_exists('add_menu_page')) {
+			add_menu_page(__('設定', 'throws-spam-away'), __('Throws SPAM Away', 'throws-spam-away'), $mincap, 'throws-spam-away', array( $this, 'options_page'));
+		}
 
+		if ( get_option( 'tsa_spam_data_save' ) == "1" ) {
+			if (function_exists('add_submenu_page')) {
+				add_submenu_page('throws-spam-away', __('スパムデータ', 'throws-spam-away'), __('スパムデータ', 'throws-spam-away'), $spam_mincap, 'throws-spam-away/throws_spam_away.class.php', array($this, 'spams_list'));
+			}
+		}
 		// 従来通りスパムデータ保存しない場合はスルーする
 		if ( get_option( 'tsa_spam_data_save' ) != 1 ) {
 			// N/A
@@ -543,19 +552,6 @@ class ThrowsSpamAway {
 
 		// 設定完了の場合はメッセージ表示
 		$_saved = FALSE;
-		// スパム情報から 特定IPアドレス削除
-		if ( $_POST['act'] != NULL && $_POST['act'] == "remove_ip" ) {
-			$remove_ip_address = @htmlspecialchars($_POST['ip_address']);
-			if ( !isset($remove_ip_address) || strlen($remove_ip_address) == 0 ) {
-				// N/A
-			} else {
-				// スパムデータベースから特定IP情報削除
-				$wpdb->query(
-					"DELETE FROM ".$this->table_name." WHERE ip_address = '".$remove_ip_address."' "
-				);
-				$_saved = TRUE;
-			}
-		}
 		if ( $_GET['settings-updated'] == "true" ) {
 			$_saved = TRUE;
 		}
@@ -619,14 +615,6 @@ function addIpAddresses(newAddressStr) {
         alert('指定されたIPアドレスは\nすでに追加されています。');
     }
 	return false;
-}
-function removeIpAddressOnData(ipAddressStr) {
-	if (confirm('['+ipAddressStr+'] をスパムデータベースから削除します。よろしいですか？この操作は取り消せません')) {
-		jQuery('#remove_ip_address').val(ipAddressStr);
-		jQuery('#remove').submit();
-	} else {
-		return false;
-	}
 }
 </script>
 <div class="wrap">
@@ -948,389 +936,8 @@ function removeIpAddressOnData(ipAddressStr) {
 			<input type="submit" class="button-primary"
 				value="<?php _e('Save Changes') ?>" />
 		</p>
-
-		<?php
-		if ( get_option( 'tsa_spam_data_save' ) == "1" ) {
-// 日数
-$gdays = get_option( 'tsa_spam_keep_day_count', $default_spam_keep_day_count);
-if ( $gdays < $lower_spam_keep_day_count ) { $gdays = $lower_spam_keep_day_count; }
-// 表カラー
-$unique_color="#114477";
-$web_color="#3377B6";
-?>
-		<h3>スパム投稿<?php echo $gdays; ?>日間の推移</h3>
-
-		<div style="background-color: #efefef;">
-			<table style="width: 100%; border: none;">
-				<tr>
-					<?php
-					$total_qry = "
-					SELECT count(ppd) as pageview, ppd
-					FROM (select ip_address, SUBSTRING(post_date,1,10) as ppd from $this->table_name) as A
-					GROUP BY ppd HAVING ppd >= '".gmdate('Y-m-d', current_time('timestamp')-86400*$gdays)."'
-			ORDER BY pageview DESC
-			LIMIT 1
-			";
-					$qry = $wpdb->get_row($total_qry);
-					$maxxday=$qry->pageview;
-
-					$total_vis = "
-					SELECT count(distinct ip_address) as vis, ppd
-					FROM (select ip_address, SUBSTRING(post_date,1,10) as ppd from $this->table_name) as B
-					GROUP BY ppd HAVING ppd >= '" . gmdate( 'Y-m-d', current_time( 'timestamp' ) - 86400 * $gdays ) . "'
-				ORDER BY vis DESC
-				LIMIT 1
-				";
-					$qry_vis = $wpdb->get_row($total_vis);
-					$maxxday += $qry_vis->vis;
-
-					if ( $maxxday == 0 ) {
-$maxxday = 1;
-}
-
-// Y
-$gd = ( 100 / $gdays ).'%';
-for ( $gg = $gdays - 1; $gg >= 0; $gg-- ) {
-	// TOTAL SPAM COUNT
-	$visitor_qry = "
-	SELECT count(DISTINCT ip_address) AS total
-	FROM (select ip_address, SUBSTRING(post_date,1,10) as ppd from $this->table_name) as B
-	WHERE ppd = '".gmdate('Y-m-d', current_time('timestamp')-86400*$gg)."'
-							";
-	$qry_visitors = $wpdb->get_row($visitor_qry);
-	$px_visitors = round($qry_visitors->total*100/$maxxday);
-	// TOTAL
-	$pageview_qry = "
-	SELECT count(ppd) as total
-	FROM (select ip_address, SUBSTRING(post_date,1,10) as ppd from $this->table_name) as C
-	WHERE ppd = '".gmdate('Y-m-d', current_time('timestamp')-86400*$gg)."'
-					";
-	$qry_pageviews = $wpdb->get_row($pageview_qry);
-	$px_pageviews = round($qry_pageviews->total*100/$maxxday);
-	$px_white = 100 - $px_pageviews - $px_visitors;
-	if ($px_white < 0) {
-$px_white = 0;
-}
-
-print '<td width="'.$gd.'" valign="bottom"';
-if($start_of_week == gmdate('w',current_time('timestamp')-86400*$gg)) {
-print ' style="border-left:2px dotted gray;"';
-}  # week-cut
-print "><div style='float:left;width:100%;font-family:Helvetica;font-size:7pt;text-align:center;border-right:1px solid white;color:black;'>
-				<div style='background:#ffffff;width:100%;height:".$px_white."px;'></div>
-				<div style='background:$unique_color;width:100%;height:".$px_visitors."px;' title='".$qry_visitors->total." ip_addresses'></div>
-				<div style='background:$web_color;width:100%;height:".$px_pageviews."px;' title='".$qry_pageviews->total." spam comments'></div>
-				<div style='background:gray;width:100%;height:1px;'></div>
-				<br />".gmdate('d', current_time('timestamp')-86400*$gg) . '<br />' . gmdate('M', current_time('timestamp')-86400*$gg) ."
-				<div style='background:$ffffff;width:100%;height:2.2em;'>".$qry_visitors->total."<br />".$qry_pageviews->total."</div>
-				<br clear=\"all\" /></div>
-				</td>\n";
-}
-?>
-				</tr>
-			</table>
-		</div>
-		&nbsp;※&nbsp;数値は
-		&lt;上段&gt;がSPAM投稿したユニークIPアドレス数、&nbsp;&lt;下段&gt;が破棄したスパム投稿数<br />
-
-<?php
-			// wp_tsa_spam の ip_address カラムに存在するIP_ADDRESS投稿は無視するか
-			$results = $wpdb->get_results(
-"SELECT D.cnt as cnt,E.ip_address as ip_address, D.ppd as post_date, E.error_type as error_type, E.author as author, E.comment as comment FROM
-((select count(ip_address) as cnt, ip_address, max(post_date) as ppd, error_type, author, comment from $this->table_name
-WHERE post_date >= '". gmdate( 'Y-m-d', current_time( 'timestamp' ) - 86400 * $gdays )."'
-GROUP BY ip_address) as D INNER JOIN $this->table_name as E ON D.ip_address = E.ip_address AND D.ppd = E.post_date)
-ORDER BY post_date DESC"
-);
-?>
-			<h4>
-				過去
-				<?php echo $gdays; ?>
-				日間に無視投稿されたIPアドレス
-			</h4>
-			<p>
-				※「このIPアドレスを任意のブロック対象IPアドレスにコピーする」ボタンを押した場合は上の<b><a href="#tsa_submit_button">「変更を保存」</a></b>をクリックし内容を保存してください。
-			</p>
-			<p>※IPアドレスをクリックすると特定のホストが存在するか確認し存在する場合は表示されます。</p>
-			<p>「スパムデータから削除する」ボタンを押しますと該当IPアドレスのスパム投稿データが削除されます。テストしたあとの削除などに使用してください。</p>
-			<?php if ( count( $results ) > 0 ) {
-				$p_url = WP_PLUGIN_URL.'/'.str_replace(basename( __FILE__),"",plugin_basename(__FILE__));
-				wp_enqueue_script("jquery.tablesorter", $p_url."js/jquery.tablesorter.min.js", array('jquery'), FALSE);
-				wp_enqueue_style("jquery.tablesorter", $p_url."images/style.css");
-				wp_enqueue_script("jquery.tipTip", $p_url."js/jquery.tipTip.js", array('jquery'), FALSE);
-				wp_enqueue_style("jquery.tipTip", $p_url."css/tipTip.css");
-				?>
-<style type="text/css">
-<!--
-/** 変更ボタン */
-p.submit .button-primary {
-	width: 200px;
-	height: 30px;
-	margin: 20px auto 50px 20px;
-}
-/** ------ lightbox風 ----- */
-#kotak-dialog {
-  position:absolute;
-  top:20%;
-  left:50%;
-  margin:0px 0px 0px -200px;
-  width:400px;
-  height:auto;
-  background-color:#fff;
-  -webkit-box-shadow:0px 1px 2px rgba(0,0,0,0.4);
-  -moz-box-shadow:0px 1px 2px rgba(0,0,0,0.4);
-  box-shadow:0px 1px 2px rgba(0,0,0,0.4);
-  z-index:1000;
-  display:none;
-}
-
-#kotak-dialog *:focus {
-  outline:none;
-}
-
-#kotak-dialog h3.title {
-  background-color:#3B5998;
-  padding:10px 15px;
-  color:#fff;
-  font:normal 16px Arial,Sans-Serif;
-  margin:0px 0px 0px 0px;
-  position:relative;
-}
-
-#kotak-dialog h3.title a {
-  position:absolute;
-  top:10px;
-  right:15px;
-  color:#fff;
-  text-decoration:none;
-  cursor:pointer;
-}
-
-#kotak-dialog .isi-dialog {
-  margin:15px;
-  font:normal 12px Arial,Sans-Serif;
-}
-
-#kotak-dialog .button-wrapper {
-  padding:10px 15px 0px;
-  border-top:1px solid #ddd;
-  margin-top:15px;
-}
-
-#kotak-dialog .button-wrapper button {
-  background-color:#FF0C39;
-  border:none;
-  font:bold 12px Arial,Sans-Serif;
-  color:#fff;
-  padding:5px 10px;
-  -webkit-border-radius:3px;
-  -moz-border-radius:3px;
-  border-radius:3px;
-  cursor:pointer;
-}
-
-#kotak-dialog .button-wrapper button:hover {
-  background-color:#aaa;
-}
-
-#dialog-overlay {
-  position:fixed !important;
-  position:absolute;
-  z-index:999;
-  top:0px;
-  right:0px;
-  bottom:0px;
-  left:0px;
-  background-color:#000;
-  display:none;
-}
-
-
-/* Iframe */
-#iframeContainer iframe {
-  width:100%;
-  height:300px;
-  border:none;
-  background-color:#ccc;
-  overflow:auto;
-}
-
-/** スクロール対象テーブルCSS */
-#spam_list {
-	background-color: #ffffff;
- 	border-collapse:;
- 	font-size: 1em !important;
-}
-/** 全体container */
-#spam_list_container {
-	position: relative;
-	padding-top: 26px;
-	width: 928px; /* 列幅合計＋セル間の幅(2px)の合計＋20px */
-	border: 1px solid #3377b6;
-	background-color: #ffffff;
-}
-/** tbody スクロール対象 */
-#spam_list_div {
-	overflow: auto;
-	height: 600px;
-}
-
-#spam_list thead tr {
-	position: absolute;
-	top: 0;
-	left: 0;
-	background-color: #ffffff;
-}
-#spam_list thead tr th {
-	background-color: #3377b6;
-	color: #fff;
-	padding: 3px 0px;
-}
-#spam_list tbody tr td {
-	background-color: #efefef;
-	color: black;
-	padding: 3px 6px;
-}
-#spam_list tbody tr.odd td {
-	background-color:#F0F0F6;
-}
-
-.cols0 { width: 200px; }
-.cols1 { width: 50px; }
-.cols2 { width: 100px; }
-.cols3 { width: 380px; }
-.cols4 { width: 170px; }
-
--->
-</style>
-<script type="text/JavaScript">
-<!--
-jQuery(function() {
-	jQuery('#spam_list').tablesorter({
-		  widgets: ['zebra'],
-		  headers: {
-			0: { id: "ipAddress" },
-			1: { sorter: "digit" },
-			2: { sorter: "shortDate" },
-			3: { sorter: false }
-			}
-		});
-		// tipTip
-		jQuery(".tip").tipTip({
-		    activation: "hover", // hover か focus か click で起動
-		    keepAlive: "true",   // true か false true だとずっと出ている。
-		    maxWidth: "auto", //ツールチップ最大幅
-		    edgeOffset: 10,   //要素からのオフセット距離
-		    defaultPosition: "left", // デフォルト表示位置 bottom(default) か top か left か right
-		    fadeIn: 300,       // フェードインのスピード
-		    fadeOut: 500       // フェードアウトのスピード
-		});
-		jQuery(".tip_click").tipTip({
-		    activation: "click", // hover か focus か click で起動
-		    keepAlive: "true",   // true か false true だとずっと出ている。
-		    maxWidth: "auto", //ツールチップ最大幅
-		    edgeOffset: 10,   //要素からのオフセット距離
-		    defaultPosition: "left", // デフォルト表示位置 bottom(default) か top か left か right
-		    fadeIn: 300,       // フェードインのスピード
-		    fadeOut: 500       // フェードアウトのスピード
-		});
-
-	});
--->
-</script>
-	<p><strong>投稿内容の判定</strong>&nbsp;最新投稿内容には最近のスパムコメント内容及びエラー判定が表示されます。●にカーソルを重ねると内容が表示されます。</p>
-	<div id="spam_list_container">
-		<div id="spam_list_div">
-			<table id="spam_list" class="tablesorter">
-				<colgroup class="cols0"></colgroup>
-				<colgroup class="cols1"></colgroup>
-				<colgroup class="cols2"></colgroup>
-				<colgroup class="cols3"></colgroup>
-				<colgroup class="cols4"></colgroup>
-				<thead>
-					<tr>
-						<th class="cols0">IPアドレス</th>
-						<th class="cols1">投稿数</th>
-						<th class="cols2">最終投稿日時</th>
-						<th class="cols3">スパムIP登録</th>
-						<th class="cols4">最新投稿内容</th>
-					</tr>
-				</thead>
-				<tbody>
-<?php
-	foreach ($results as $item) {
-		$spam_ip = $item->ip_address;
-		$spam_cnt = $item->cnt;
-		$last_post_date = $item->post_date;
-		$spam_error_type = $item->error_type;
-		$spam_author = $item->author;
-		$spam_comment = $item->comment;
-
-		// エラー変換
-		$spam_error_type_str = $spam_error_type;
-		switch ($spam_error_type) {
-			case "not_japanese":
-				$spam_error_type_str = "日本語以外";
-				break;
-			case "must_word":
-				$spam_error_type_str = "必須キーワード無し";
-				break;
-			case "ng_word":
-				$spam_error_type_str = "NGキーワード混入";
-				break;
-			case "block_ip":
-				$spam_error_type_str = "ブロック対象IPアドレス";
-				break;
-			case "spam_trackback":
-				$spam_error_type_str = "トラックバックスパム";
-				break;
-			case "url_count_over":
-				$spam_error_type_str = "URL文字列混入数オーバー";
-				break;
-			case "spam_limit_over":
-				$spam_error_type_str = "一定時間スパム判定エラー";
-				break;
-			case "dummy_param_field":
-				$spam_error_type_str = "ダミー項目エラー";
-				break;
-		}
-?>
-					<tr>
-						<td>
-							<b><a href="javascript:void(0);"
-									onclick="window.open('<?php echo $p_url; ?>hostbyip.php?ip=<?php echo $spam_ip; ?>', 'hostbyip', 'width=350,height=300,scrollbars=no,location=no,menubar=no,toolbar=no,directories=no,status=no');"><?php echo $spam_ip; ?>
-							</a></b><br clear="all" />
-							<input type="button"
-							onclick="javascript:removeIpAddressOnData('<?php echo $spam_ip; ?>');"
-							value="スパムデータから削除する" />
-						</td>
-						<td><?php echo $spam_cnt; ?>回</td>
-						<td><?php echo $last_post_date; ?></td>
-						<td><input type="button"
-							onclick="javascript:addIpAddresses('<?php echo $spam_ip; ?>');"
-							value="ブロック対象IPアドレスにコピー[<?php echo $spam_ip; ?>]" /></td>
-						<td><?php echo $spam_error_type_str; ?><?php if ($spam_author != NULL && $spam_comment != NULL) { ?>&nbsp;<a name="<?php echo $spam_ip; ?>" class="tip tip_click"  title="名前：<?php echo $spam_author; ?><br />内容：<?php echo $spam_comment; ?>">●</a><?php } ?>
-						</td>
-					</tr>
-<?php
-	}
-?>
-				</tbody>
-			</table>
-		</div>
-	</div>
-<?php } ?>
-<?php } ?>
 	</form>
-	<form method="post" id="remove">
-		<input type="hidden" name="ip_address" id="remove_ip_address" value="" />
-		<input type="hidden" name="act" value="remove_ip" />
-	</form>
-	<p>スパム投稿IPアドレスを参考にアクセス禁止対策を行なってください。</p>
-
-
 </div>
-<br clear="all" />
 <?php
 	}
 
@@ -1371,7 +978,7 @@ jQuery(function() {
 			if ( get_option( 'tsa_spam_data_save', $default_spam_data_save ) == "1" ) {
 				$spam_contents = array();
 				$spam_contents['error_type'] = "spam_trackback";
-				$spam_contents['author'] = mb_strcut($author, 0, 255);
+				$spam_contents['author'] = mb_strcut(strip_tags($author), 0, 255);
 				$spam_contents['comment'] = mb_strcut(strip_tags($comment), 0, 255);
 
 				$this->save_post_meta( $post_id, $ip, $spam_contents );
@@ -1398,6 +1005,467 @@ jQuery(function() {
 			return $results[0];
 		}
 		return NULL;
+	}
+
+	/**
+	 * スパムデータベース表示
+	 * @param
+	 * @return HTML
+	 */
+	 function spams_list() {
+		global $wpdb;
+		$_saved = FALSE;
+		// スパム情報から 特定IPアドレス削除
+		if ( $_POST['act'] != NULL && $_POST['act'] == "remove_ip" ) {
+			$remove_ip_address = @htmlspecialchars($_POST['ip_address']);
+			if ( !isset($remove_ip_address) || strlen($remove_ip_address) == 0 ) {
+				// N/A
+			} else {
+				// スパムデータベースから特定IP情報削除
+				$wpdb->query(
+						"DELETE FROM ".$this->table_name." WHERE ip_address = '".$remove_ip_address."' "
+				);
+				$_saved = TRUE;
+				$message = "スパムデータから $remove_ip_address のデータを削除しました。";
+			}
+		} elseif ( $_POST['act'] != NULL && $_POST['act'] == "add_ip" ) {
+			$add_ip_address = @htmlspecialchars($_POST['ip_address']);
+			if ( !isset($add_ip_address) || strlen($add_ip_address) == 0 ) {
+				// N/A
+			} else {
+				// 対象IPアドレスに一つ追加
+				$block_ip_addresses_str = get_option('tsa_block_ip_addresses', '');
+				$block_ip_addresses = str_replace("\n", ",", $block_ip_addresses_str);
+				$ip_list = mb_split(  ",", $block_ip_addresses );
+				$dup_flg = FALSE;
+				foreach ( $ip_list as $ip ) {
+					if ( $ip == trim($add_ip_address) ) {
+						$_saved = TRUE;
+						$message = "$add_ip_address はすでに設定されています。";
+						$dup_flg = TRUE;
+						break;
+					}
+				}
+				if ( $dup_flg == FALSE ) {
+					$added_block_ip_addresses_str = $block_ip_addresses_str . "\n" .$add_ip_address;
+					update_option("tsa_block_ip_addresses", $added_block_ip_addresses_str);
+					$_saved = TRUE;
+					$message = "$add_ip_address を追加設定しました。";
+				}
+			}
+		}
+		if ( $_GET['settings-updated'] == "true" ) {
+			$_saved = TRUE;
+		}
+		?>
+		<div class="wrap">
+<?php
+		if ( get_option( 'tsa_spam_data_save' ) == "1" ) {
+			// 日数
+			$gdays = get_option( 'tsa_spam_keep_day_count', $default_spam_keep_day_count);
+			if ( $gdays < $lower_spam_keep_day_count ) { $gdays = $lower_spam_keep_day_count; }
+			// 表カラー
+			$unique_color="#114477";
+			$web_color="#3377B6";
+			?>
+			<h2>Throws SPAM Away スパムデータ</h2>
+			<h3>スパム投稿<?php echo $gdays; ?>日間の推移</h3>
+	<?php if ($_saved) { ?>
+	<div class="updated" style="padding: 10px; width: 50%;" id="message"><?php echo $message; ?></div>
+	<?php } ?>
+			<div style="background-color: #efefef;">
+				<table style="width: 100%; border: none;">
+					<tr>
+						<?php
+						$total_qry = "
+						SELECT count(ppd) as pageview, ppd
+						FROM (select ip_address, SUBSTRING(post_date,1,10) as ppd from $this->table_name) as A
+						GROUP BY ppd HAVING ppd >= '".gmdate('Y-m-d', current_time('timestamp')-86400*$gdays)."'
+				ORDER BY pageview DESC
+				LIMIT 1
+				";
+						$qry = $wpdb->get_row($total_qry);
+						$maxxday=$qry->pageview;
+
+						$total_vis = "
+						SELECT count(distinct ip_address) as vis, ppd
+						FROM (select ip_address, SUBSTRING(post_date,1,10) as ppd from $this->table_name) as B
+						GROUP BY ppd HAVING ppd >= '" . gmdate( 'Y-m-d', current_time( 'timestamp' ) - 86400 * $gdays ) . "'
+					ORDER BY vis DESC
+					LIMIT 1
+					";
+						$qry_vis = $wpdb->get_row($total_vis);
+						$maxxday += $qry_vis->vis;
+
+						if ( $maxxday == 0 ) {
+	$maxxday = 1;
+	}
+
+	// Y
+	$gd = ( 100 / $gdays ).'%';
+	for ( $gg = $gdays - 1; $gg >= 0; $gg-- ) {
+		// TOTAL SPAM COUNT
+		$visitor_qry = "
+		SELECT count(DISTINCT ip_address) AS total
+		FROM (select ip_address, SUBSTRING(post_date,1,10) as ppd from $this->table_name) as B
+		WHERE ppd = '".gmdate('Y-m-d', current_time('timestamp')-86400*$gg)."'
+								";
+		$qry_visitors = $wpdb->get_row($visitor_qry);
+		$px_visitors = round($qry_visitors->total*100/$maxxday);
+		// TOTAL
+		$pageview_qry = "
+		SELECT count(ppd) as total
+		FROM (select ip_address, SUBSTRING(post_date,1,10) as ppd from $this->table_name) as C
+		WHERE ppd = '".gmdate('Y-m-d', current_time('timestamp')-86400*$gg)."'
+						";
+		$qry_pageviews = $wpdb->get_row($pageview_qry);
+		$px_pageviews = round($qry_pageviews->total*100/$maxxday);
+		$px_white = 100 - $px_pageviews - $px_visitors;
+		if ($px_white < 0) {
+	$px_white = 0;
+	}
+
+	print '<td width="'.$gd.'" valign="bottom"';
+	if($start_of_week == gmdate('w',current_time('timestamp')-86400*$gg)) {
+	print ' style="border-left:2px dotted gray;"';
+	}  # week-cut
+	print "><div style='float:left;width:100%;font-family:Helvetica;font-size:7pt;text-align:center;border-right:1px solid white;color:black;'>
+					<div style='background:#ffffff;width:100%;height:".$px_white."px;'></div>
+					<div style='background:$unique_color;width:100%;height:".$px_visitors."px;' title='".$qry_visitors->total." ip_addresses'></div>
+					<div style='background:$web_color;width:100%;height:".$px_pageviews."px;' title='".$qry_pageviews->total." spam comments'></div>
+					<div style='background:gray;width:100%;height:1px;'></div>
+					<br />".gmdate('d', current_time('timestamp')-86400*$gg) . '<br />' . gmdate('M', current_time('timestamp')-86400*$gg) ."
+					<div style='background:$ffffff;width:100%;height:2.2em;'>".$qry_visitors->total."<br />".$qry_pageviews->total."</div>
+					<br clear=\"all\" /></div>
+					</td>\n";
+	}
+	?>
+					</tr>
+				</table>
+			</div>
+			&nbsp;※&nbsp;数値は
+			&lt;上段&gt;がSPAM投稿したユニークIPアドレス数、&nbsp;&lt;下段&gt;が破棄したスパム投稿数<br />
+
+	<?php
+				// wp_tsa_spam の ip_address カラムに存在するIP_ADDRESS投稿は無視するか
+				$results = $wpdb->get_results(
+	"SELECT D.cnt as cnt,E.ip_address as ip_address, D.ppd as post_date, E.error_type as error_type, E.author as author, E.comment as comment FROM
+	((select count(ip_address) as cnt, ip_address, max(post_date) as ppd, error_type, author, comment from $this->table_name
+	WHERE post_date >= '". gmdate( 'Y-m-d', current_time( 'timestamp' ) - 86400 * $gdays )."'
+	GROUP BY ip_address) as D INNER JOIN $this->table_name as E ON D.ip_address = E.ip_address AND D.ppd = E.post_date)
+	ORDER BY post_date DESC"
+	);
+	?>
+				<h4>
+					過去
+					<?php echo $gdays; ?>
+					日間に無視投稿されたIPアドレス
+				</h4>
+				<p>※IPアドレスをクリックすると特定のホストが存在するか確認し存在する場合は表示されます。</p>
+				<p>「スパムデータから削除する」ボタンを押しますと該当IPアドレスのスパム投稿データが削除されます。テストしたあとの削除などに使用してください。</p>
+				<?php if ( count( $results ) > 0 ) {
+					$p_url = WP_PLUGIN_URL.'/'.str_replace(basename( __FILE__),"",plugin_basename(__FILE__));
+					wp_enqueue_script("jquery.tablesorter", $p_url."js/jquery.tablesorter.min.js", array('jquery'), FALSE);
+					wp_enqueue_style("jquery.tablesorter", $p_url."images/style.css");
+					wp_enqueue_script("jquery.tipTip", $p_url."js/jquery.tipTip.js", array('jquery'), FALSE);
+					wp_enqueue_style("jquery.tipTip", $p_url."css/tipTip.css");
+					?>
+	<style type="text/css">
+	<!--
+	/** 変更ボタン */
+	p.submit .button-primary {
+		width: 200px;
+		height: 30px;
+		margin: 20px auto 50px 20px;
+	}
+	/** ------ lightbox風 ----- */
+	#kotak-dialog {
+	  position:absolute;
+	  top:20%;
+	  left:50%;
+	  margin:0px 0px 0px -200px;
+	  width:400px;
+	  height:auto;
+	  background-color:#fff;
+	  -webkit-box-shadow:0px 1px 2px rgba(0,0,0,0.4);
+	  -moz-box-shadow:0px 1px 2px rgba(0,0,0,0.4);
+	  box-shadow:0px 1px 2px rgba(0,0,0,0.4);
+	  z-index:1000;
+	  display:none;
+	}
+
+	#kotak-dialog *:focus {
+	  outline:none;
+	}
+
+	#kotak-dialog h3.title {
+	  background-color:#3B5998;
+	  padding:10px 15px;
+	  color:#fff;
+	  font:normal 16px Arial,Sans-Serif;
+	  margin:0px 0px 0px 0px;
+	  position:relative;
+	}
+
+	#kotak-dialog h3.title a {
+	  position:absolute;
+	  top:10px;
+	  right:15px;
+	  color:#fff;
+	  text-decoration:none;
+	  cursor:pointer;
+	}
+
+	#kotak-dialog .isi-dialog {
+	  margin:15px;
+	  font:normal 12px Arial,Sans-Serif;
+	}
+
+	#kotak-dialog .button-wrapper {
+	  padding:10px 15px 0px;
+	  border-top:1px solid #ddd;
+	  margin-top:15px;
+	}
+
+	#kotak-dialog .button-wrapper button {
+	  background-color:#FF0C39;
+	  border:none;
+	  font:bold 12px Arial,Sans-Serif;
+	  color:#fff;
+	  padding:5px 10px;
+	  -webkit-border-radius:3px;
+	  -moz-border-radius:3px;
+	  border-radius:3px;
+	  cursor:pointer;
+	}
+
+	#kotak-dialog .button-wrapper button:hover {
+	  background-color:#aaa;
+	}
+
+	#dialog-overlay {
+	  position:fixed !important;
+	  position:absolute;
+	  z-index:999;
+	  top:0px;
+	  right:0px;
+	  bottom:0px;
+	  left:0px;
+	  background-color:#000;
+	  display:none;
+	}
+
+
+	/* Iframe */
+	#iframeContainer iframe {
+	  width:100%;
+	  height:300px;
+	  border:none;
+	  background-color:#ccc;
+	  overflow:auto;
+	}
+
+	/** スクロール対象テーブルCSS */
+	#spam_list {
+		background-color: #ffffff;
+	 	border-collapse:;
+	 	font-size: 1em !important;
+	}
+	/** 全体container */
+	#spam_list_container {
+		position: relative;
+		padding-top: 26px;
+		width: 928px; /* 列幅合計＋セル間の幅(2px)の合計＋20px */
+		border: 1px solid #3377b6;
+		background-color: #ffffff;
+	}
+	/** tbody スクロール対象 */
+	#spam_list_div {
+		overflow: auto;
+		height: 600px;
+	}
+
+	#spam_list thead tr {
+		position: absolute;
+		top: 0;
+		left: 0;
+		background-color: #ffffff;
+	}
+	#spam_list thead tr th {
+		background-color: #3377b6;
+		color: #fff;
+		padding: 3px 0px;
+	}
+	#spam_list tbody tr td {
+		background-color: #efefef;
+		color: black;
+		padding: 3px 6px;
+	}
+	#spam_list tbody tr.odd td {
+		background-color:#F0F0F6;
+	}
+
+	.cols0 { width: 200px; }
+	.cols1 { width: 50px; }
+	.cols2 { width: 100px; }
+	.cols3 { width: 380px; }
+	.cols4 { width: 170px; }
+
+	-->
+	</style>
+	<script type="text/JavaScript">
+	<!--
+	jQuery(function() {
+		jQuery('#spam_list').tablesorter({
+			  widgets: ['zebra'],
+			  headers: {
+				0: { id: "ipAddress" },
+				1: { sorter: "digit" },
+				2: { sorter: "shortDate" },
+				3: { sorter: false }
+				}
+			});
+			// tipTip
+			jQuery(".tip").tipTip({
+			    activation: "hover", // hover か focus か click で起動
+			    keepAlive: "true",   // true か false true だとずっと出ている。
+			    maxWidth: "auto", //ツールチップ最大幅
+			    edgeOffset: 10,   //要素からのオフセット距離
+			    defaultPosition: "left", // デフォルト表示位置 bottom(default) か top か left か right
+			    fadeIn: 300,       // フェードインのスピード
+			    fadeOut: 500       // フェードアウトのスピード
+			});
+			jQuery(".tip_click").tipTip({
+			    activation: "click", // hover か focus か click で起動
+			    keepAlive: "true",   // true か false true だとずっと出ている。
+			    maxWidth: "auto", //ツールチップ最大幅
+			    edgeOffset: 10,   //要素からのオフセット距離
+			    defaultPosition: "left", // デフォルト表示位置 bottom(default) か top か left か right
+			    fadeIn: 300,       // フェードインのスピード
+			    fadeOut: 500       // フェードアウトのスピード
+			});
+
+		});
+
+	function removeIpAddressOnData(ipAddressStr) {
+		if (confirm('['+ipAddressStr+'] をスパムデータベースから削除します。よろしいですか？この操作は取り消せません')) {
+			jQuery('#remove_ip_address').val(ipAddressStr);
+			jQuery('#remove').submit();
+		} else {
+			return false;
+		}
+	}
+
+	function addIpAddressOnData(ipAddressStr) {
+		if (confirm('['+ipAddressStr+'] を無視対象に追加します。よろしいですか？削除は設定から行ってください')) {
+			jQuery('#add_ip_address').val(ipAddressStr);
+			jQuery('#adding').submit();
+		} else {
+			return false;
+		}
+	}
+	-->
+	</script>
+		<p><strong>投稿内容の判定</strong>&nbsp;最新投稿内容には最近のスパムコメント内容及びエラー判定が表示されます。●にカーソルを重ねると内容が表示されます。</p>
+		<div id="spam_list_container">
+			<div id="spam_list_div">
+				<table id="spam_list" class="tablesorter">
+					<colgroup class="cols0"></colgroup>
+					<colgroup class="cols1"></colgroup>
+					<colgroup class="cols2"></colgroup>
+					<colgroup class="cols3"></colgroup>
+					<colgroup class="cols4"></colgroup>
+					<thead>
+						<tr>
+							<th class="cols0">IPアドレス</th>
+							<th class="cols1">投稿数</th>
+							<th class="cols2">最終投稿日時</th>
+							<th class="cols3">スパムIP登録</th>
+							<th class="cols4">最新投稿内容</th>
+						</tr>
+					</thead>
+					<tbody>
+	<?php
+		foreach ($results as $item) {
+			$spam_ip = $item->ip_address;
+			$spam_cnt = $item->cnt;
+			$last_post_date = $item->post_date;
+			$spam_error_type = $item->error_type;
+			$spam_author = strip_tags($item->author);
+			$spam_comment = strip_tags($item->comment);
+
+			// エラー変換
+			$spam_error_type_str = $spam_error_type;
+			switch ($spam_error_type) {
+				case "not_japanese":
+					$spam_error_type_str = "日本語以外";
+					break;
+				case "must_word":
+					$spam_error_type_str = "必須キーワード無し";
+					break;
+				case "ng_word":
+					$spam_error_type_str = "NGキーワード混入";
+					break;
+				case "block_ip":
+					$spam_error_type_str = "ブロック対象IPアドレス";
+					break;
+				case "spam_trackback":
+					$spam_error_type_str = "トラックバックスパム";
+					break;
+				case "url_count_over":
+					$spam_error_type_str = "URL文字列混入数オーバー";
+					break;
+				case "spam_limit_over":
+					$spam_error_type_str = "一定時間スパム判定エラー";
+					break;
+				case "dummy_param_field":
+					$spam_error_type_str = "ダミー項目エラー";
+					break;
+			}
+	?>
+						<tr>
+							<td>
+								<b><a href="javascript:void(0);"
+										onclick="window.open('<?php echo $p_url; ?>hostbyip.php?ip=<?php echo $spam_ip; ?>', 'hostbyip', 'width=350,height=300,scrollbars=no,location=no,menubar=no,toolbar=no,directories=no,status=no');"><?php echo $spam_ip; ?>
+								</a></b><br clear="all" />
+								<input type="button"
+								onclick="javascript:removeIpAddressOnData('<?php echo $spam_ip; ?>');"
+								value="スパムデータから削除する" />
+							</td>
+							<td><?php echo $spam_cnt; ?>回</td>
+							<td><?php echo $last_post_date; ?></td>
+							<td><input type="button"
+								onclick="javascript:addIpAddressOnData('<?php echo $spam_ip; ?>');"
+								value="ブロック対象IPアドレス追加[<?php echo $spam_ip; ?>]" /></td>
+							<td><?php echo $spam_error_type_str; ?><?php if ($spam_author != NULL && $spam_comment != NULL) { ?>&nbsp;<a name="<?php echo $spam_ip; ?>" class="tip tip_click"  title="名前：<?php echo $spam_author; ?><br />内容：<?php echo $spam_comment; ?>">●</a><?php } ?>
+							</td>
+						</tr>
+	<?php
+		}
+	?>
+					</tbody>
+				</table>
+			</div>
+		</div>
+	<?php } ?>
+	<?php } else { ?>
+		<p>スパムデータベースを使用するにはThrows SPAM Awayのメニュー「設定」から<br />
+		「スパムコメント投稿情報を保存しますか？」項目を<strong>「スパムコメント情報を保存する」</strong>に設定してください</p>
+	<?php } ?>
+		<form method="post" id="remove">
+			<input type="hidden" name="ip_address" id="remove_ip_address" value="" />
+			<input type="hidden" name="act" value="remove_ip" />
+		</form>
+		<form method="post" id="adding">
+			<input type="hidden" name="ip_address" id="add_ip_address" value="" />
+			<input type="hidden" name="act" value="add_ip" />
+		</form>
+		<p>スパム投稿IPアドレスを参考にアクセス禁止対策を行なってください。</p>
+
+
+	</div>
+	<br clear="all" />
+	<?php
 	}
 
 }
