@@ -16,7 +16,7 @@ $last_spam_comment_result = $newThrowsSpamAway->get_last_spam_comment($spam_ip);
 $last_comment_date = $last_spam_comment_result->post_date;
 $last_comment_post = get_permalink($last_spam_comment_result->post_id);
 $last_comment_post_title = get_the_title(get_post($last_spam_comment_result->post_id));
-$is_spam_champuru = ( $newThrowsSpamAway->rejectSpamIP($spam_ip) ? FALSE : TRUE );
+$is_spam_champuru = ( $newThrowsSpamAway->reject_spam_ip( $spam_ip ) ? FALSE : TRUE );
 ?><!DOCTYPE html>
 <!--[if IE 8]>
 <html xmlns="http://www.w3.org/1999/xhtml" class="ie8 wp-toolbar"  lang="ja" prefix="og: http://ogp.me/ns#" >
