@@ -4,9 +4,25 @@
  Plugin URI: http://gti.jp/tsa/
  Description: コメント内に日本語の記述が存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社ジーティーアイ　さとう　たけし
- Version: 2.6
+ Version: 2.6.3
  Author URI: http://gti.jp/
+ License: GPL2
  */
+/*  Copyright 2014 Takeshi Satoh (http://gti.jp/)
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License, version 2, as
+published by the Free Software Foundation.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+*/
 require_once 'throws_spam_away.class.php';
 
 /**
@@ -15,54 +31,105 @@ require_once 'throws_spam_away.class.php';
  */
 
 // Throws SPAM Awayバージョン
-$tsa_version = "2.6";
+$tsa_version = '2.6.3';
 // スパムデータベースバージョン
 $tsa_db_version = 2.6;	// 2.6からデータベース変更 [error_type]追加
 
-/** 初期設定 */
 // エラー種別
-$error_type = "";
+$error_type = '';
+
+/** 初期設定 */
+/**
+ * 設定値変更 2.6.2から
+ */
+
 // ダミー項目でのスパム判定をするか
-$default_dummy_param_field_flg = "1";	// 1: する 2:しない
+$default_dummy_param_field_flg = '1';	// 1: する 2:しない
+
+// 日本語が存在しない場合無視対象とするか
+$default_on_flg = 1;	// 1:する
+
 // 日本語文字最小含有数
 $default_japanese_string_min_count = 3;
+
+// 無視後、元画面に戻る時間
+$default_back_second = 0;
+
 // コメント欄下に表示される注意文言（初期設定）
 $default_caution_msg = '日本語が含まれない投稿は無視されますのでご注意ください。（スパム対策）';
-// コメント欄下に表示する位置（初期設定）
-$default_caution_msg_point = "1";  //1:"comment_form", 2:"comment_form_after"
+
+// コメント欄下に表示する位置（初期設定）1:コメント送信ボタンの上 2:コメント送信フォームの下
+$default_caution_msg_point = '1';  //1:"comment_form", 2:"comment_form_after"
 
 // エラー時に表示されるエラー文言（初期設定）
 $default_error_msg = '日本語を規定文字数以上含まない記事は投稿できませんよ。';
-// 元画面に戻る時間
-$default_back_second = 0;
-// キーワードNGエラー時に表示されるエラー文言（初期設定）
-$default_ng_key_error_msg = 'NGキーワードが含まれているため投稿できません。';
-// 必須キーワードが含まれないエラー文言（初期設定）
-$default_must_key_error_msg = "必須キーワードが含まれていないため投稿できません。";
-// ブロックIPアドレスからの投稿の場合に表示されるエラー文言（初期設定）
-$default_block_ip_address_error_msg = "";
-// URL数制限値オーバーのエラー文言（初期設定）
-$default_url_count_over_error_msg = "";
+
+/** URL文字列除外 設定 */
 // URL数の制限をするか
-$default_url_count_check_flg = "1"; // 1:する
+$default_url_count_check_flg = '1'; // 1:する
+
 // URL数の制限数
 $default_ok_url_count = 3;  // ３つまで許容
 
+// URL数制限値オーバーのエラー文言（初期設定）
+$default_url_count_over_error_msg = '';
+
+/** NGキーワード/必須キーワード 制御設定 */
+
+// キーワードNGエラー時に表示されるエラー文言（初期設定）
+$default_ng_key_error_msg = 'NGキーワードが含まれているため投稿できません。';
+
+// 必須キーワードが含まれないエラー文言（初期設定）
+$default_must_key_error_msg = '必須キーワードが含まれていないため投稿できません。';
+
+/** トラックバックへの対応設定 */
+
+// トラックバックへの対応 1: する
+$default_tb_on_flg = '1';
+
+// トラックバック記事に当サイトURLがなければ無視するか
+$default_tb_url_flg = '1';
+
+/** 投稿IPアドレスによる制御設定 */
+
+// スパムちゃんぷるーホスト
+$spam_champuru_host = 'dnsbl.spam-champuru.livedoor.com';
+
+// すぱむちゃんぷるー利用初期設定
+$default_spam_champuru_flg = '1';		// "1":する
+
+// WordPressのcommentsテーブルで「spam」判定されたことがあるIPアドレスからの投稿を無視するか
+$default_ip_block_from_spam_chk_flg = '1';	// "1":する
+
+// ブロックIPアドレスからの投稿の場合に表示されるエラー文言（初期設定）
+$default_block_ip_address_error_msg = '';
+
+/** スパムデータベース */
+
+// スパムデータベース保存するか "1":保存
+$default_spam_data_save = '1';
+
+// 期間が過ぎたデータを削除するか？	"1":する
+$default_spam_data_delete_flg = '1';
+
+// スパムデータ保持期間（日）
+$default_spam_keep_day_count = 30;
+
+// 最低保存期間（日）
+$lower_spam_keep_day_count = 7;
+
+// 機能設定
+$default_spam_limit_flg = '1';
+
 // ○分以内に○回スパムとなったら○分間そのIPからのコメントははじくかの設定
-$default_spam_limit_flg = 2;	// 1:する Other:しない ※スパム情報保存がデフォルトではないのでこちらも基本はしない方向です。
+$default_spam_limit_flg = 1;	// 1:する Other:しない ※スパム情報保存がデフォルトではないのでこちらも基本はしない方向です。
 // ※スパム情報保存していないと機能しません。
 $default_spam_limit_minutes = 10;		// １０分以内に・・・
 $default_spam_limit_count = 2;			// ２回までは許そうか。
 $default_spam_limit_over_interval = 10;	// だがそれを超えたら（デフォルト３回目以降）10分はOKコメントでもスパム扱いするんでよろしく！
-$default_spam_limit_over_interval_error_msg = "";	// そしてその際のエラーメッセージは・・・
+$default_spam_limit_over_interval_error_msg = '';	// そしてその際のエラーメッセージは・・・
 
-// スパムデータ保持期間（日）
-$default_spam_keep_day_count = 30;
-// 最低保存期間（日）
-$lower_spam_keep_day_count = 7;
 
-// スパムちゃんぷるーホスト
-$spam_champuru_host = "dnsbl.spam-champuru.livedoor.com";
 
 /** オプションキー */
 // ダミーフィールドを生成しそこに入力がある場合はエラーとするかフラグ [tsa_dummy_param_field_flg] 1:する 2:しない
@@ -100,21 +167,22 @@ $spam_champuru_host = "dnsbl.spam-champuru.livedoor.com";
 /** プロセス */
 $newThrowsSpamAway = new ThrowsSpamAway;
 // トラックバックチェックフィルター
-add_filter('preprocess_comment', array(&$newThrowsSpamAway, 'trackback_spam_away'), 1, 1);
+add_filter( 'preprocess_comment', array( &$newThrowsSpamAway, 'trackback_spam_away' ), 1, 1 );
 // ダミーフィールド作成
-$dummy_param_field_flg = get_option("tsa_dummy_param_field_flg", $default_dummy_param_field_flg );
-if ( "1" == $dummy_param_field_flg ) {
-	add_action('init', array(&$newThrowsSpamAway, "tsa_scripts_init" ), 9997);
+$dummy_param_field_flg = get_option( 'tsa_dummy_param_field_flg', $default_dummy_param_field_flg );
+if ( '1' == $dummy_param_field_flg ) {
+	add_action( 'init', array( &$newThrowsSpamAway, 'tsa_scripts_init' ), 9997 );
 	add_action( "comment_form", array(&$newThrowsSpamAway, "comment_form_dummy_param_field" ), 9998);
 }
 // 注意文言表示
 // コメントフォーム表示
-$comment_disp_point = "comment_form";
-$comment_form_action_point = get_option("tsa_caution_msg_point", $default_caution_msg_point);
+$comment_disp_point = 'comment_form';
+$comment_form_action_point = get_option( 'tsa_caution_msg_point', $default_caution_msg_point );
 // フォーム内かフォーム外か判断する
-if ("2" == $comment_form_action_point) {
-    $comment_disp_point = "comment_form_after";
+if ( '2' == $comment_form_action_point ) {
+	$comment_disp_point = 'comment_form_after';
 }
-add_action($comment_disp_point, array(&$newThrowsSpamAway, "comment_form"), 9999);
+add_action( $comment_disp_point, array( &$newThrowsSpamAway, 'comment_form' ), 9999 );
 // コメントチェックフィルター
-add_action('pre_comment_on_post', array(&$newThrowsSpamAway, "comment_post"), 1);
+add_action( 'pre_comment_on_post', array( &$newThrowsSpamAway, 'comment_post' ), 1 );
+
