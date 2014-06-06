@@ -4,11 +4,11 @@
  * <p>ThrowsSpamAway</p> Class
  * WordPress's Plugin
  * @author Takeshi Satoh@GTI Inc. 2014
- *
+ * @version 2.6.3
  */
 class ThrowsSpamAway {
 
-	// version
+	// データベースのversion
 	var $version = '2.6';
 	var $table_name = NULL;
 
@@ -200,6 +200,8 @@ class ThrowsSpamAway {
 			case 'block_ip' :
 				$error_msg = get_option( 'tsa_block_ip_address_error_message', $default_block_ip_address_error_msg );
 				break;
+			case 'spam_champuru' :
+				$error_msg = get_option( 'tsa_block_ip_address_error_message', $default_block_ip_address_error_msg );
 			case 'url_count_over' :
 				$error_msg = get_option( 'tsa_url_count_over_error_message', $default_url_count_over_error_msg );
 				break;
@@ -325,7 +327,7 @@ class ThrowsSpamAway {
 			}
 		}
 		if ( $spam ) {
-			$error_type = 'block_ip';
+			$error_type = 'spam_champuru';
 			return FALSE;
 		}
 		return TRUE;
@@ -564,6 +566,7 @@ class ThrowsSpamAway {
 		if ( esc_attr( $_GET['settings-updated'] ) == 'true' ) {
 			$_saved = TRUE;
 		}
+		wp_enqueue_style( 'thorows-spam-away-styles', plugins_url( '/css/tsa_styles.css', __FILE__ ) );
 		?>
 <style>
 table.form-table {
@@ -627,12 +630,15 @@ function addIpAddresses(newAddressStr) {
 }
 </script>
 <div class="wrap">
-	<h2>Throws SPAM Away設定</h2>
+	<h2 id="option_setting">Throws SPAM Away設定</h2>
 	<?php if ( $_saved ) { ?>
 	<div class="updated" style="padding: 10px; width: 50%;" id="message">設定の更新が完了しました。</div>
 	<?php } ?>
 	<form method="post" action="options.php">
-		<h3>スパム対策機能 設定</h3>
+<p>
+<a href="spam_opt">スパム対策機能設定</a> | <a href="#url_opt">URL文字列除外 設定</a> | <a href="#keyword_opt">NGキーワード / 必須キーワード 制御設定</a> | <a href="#tb_opt">トラックバックへの対応設定</a> | <a href="#ip_opt">投稿IPアドレスによる制御設定</a> | <a href="#memo_opt">メモ</a> | <a href="#spam_data_opt">スパムデータベース</a>
+</p>
+		<h3 id="spam_opt">スパム対策機能 設定</h3>
 		<?php wp_nonce_field( 'update-options' ); ?>
 		<table class="form-table">
 			<tr valign="top">
@@ -652,7 +658,8 @@ function addIpAddresses(newAddressStr) {
 			  	（初期設定：<?php echo ( $default_dummy_param_field_flg == '2' ? "しない" : "する" ); ?>）
 			  </td>
 			</tr>
-			<tr valign="top"><td colspan="2"><hr/></td></tr>
+			</table>
+			<table class="form-table">
 			<tr valign="top">
 				<th scope="row">日本語が存在しない場合、無視対象とする<br />（日本語文字列が存在しない場合無視対象となります。）</th>
 				<td><?php
@@ -707,15 +714,18 @@ function addIpAddresses(newAddressStr) {
 					（初期設定：<?php echo ( $default_caution_msg_point == '2' ? "コメント送信フォームの下" : "コメント送信ボタンの上" ); ?>）
 				</td>
 			</tr>
-			<tr><td colspan="2">※表示が崩れる場合、<a href="#tsa_caution_msg_point">「コメント注意文言の表示位置」</a>の変更　や　<a href="#tsa_caution_message">「コメント欄の下に表示される注意文言」</a>を空白にすること　を試してみて下さい。<br />
-			「コメント欄の下に表示される注意文言」が空白の場合は文言表示のタグ自体が挿入されないようになります。</td></tr>
+			</table>
+			<p>※表示が崩れる場合、<a href="#tsa_caution_msg_point">「コメント注意文言の表示位置」</a>の変更　や　<a href="#tsa_caution_message">「コメント欄の下に表示される注意文言」</a>を空白にすること　を試してみて下さい。<br />
+			「コメント欄の下に表示される注意文言」が空白の場合は文言表示のタグ自体が挿入されないようになります。</p>
+		<table class="form-table">
 			<tr valign="top">
 				<th scope="row">日本語文字列規定値未満エラー時に表示される文言<br />（元の記事に戻ってくる時間の間のみ表示）</th>
 				<td><input type="text" name="tsa_error_message" size="80"
 					value="<?php echo get_option( 'tsa_error_message', $default_error_msg );?>" /><br />（初期設定:<?php echo $default_error_msg; ?>）</td>
 			</tr>
 		</table>
-		<h3>URL文字列除外 設定</h3>
+		<a href="#option_setting" class="alignright">▲ 上へ</a>
+		<h3 id="url_opt">URL文字列除外 設定</h3>
 		<table class="form-table">
 			<tr valign="top">
 				<th scope="row">URLらしき文字列が混入している場合エラーとするか</th>
@@ -744,7 +754,9 @@ function addIpAddresses(newAddressStr) {
 					（初期設定:<?php echo $default_url_count_over_error_msg;?>）</td>
 			</tr>
 		</table>
-		<h3>NGキーワード / 必須キーワード 制御設定</h3>
+				<a href="#option_setting" class="alignright">▲ 上へ</a>
+
+		<h3 id="keyword_opt">NGキーワード / 必須キーワード 制御設定</h3>
 		<table class="form-table">
 			<tr valign="top">
 				<th scope="row">その他NGキーワード<br />（日本語でも英語（その他）でもNGとしたいキーワードを半角カンマ区切りで複数設定できます。<br />挙動は同じです。NGキーワードだけでも使用できます。）
@@ -773,7 +785,9 @@ function addIpAddresses(newAddressStr) {
 					（初期設定:<?php echo $default_must_key_error_msg;?>）</td>
 			</tr>
 		</table>
-		<h3>トラックバックへの対応設定</h3>
+				<a href="#option_setting" class="alignright">▲ 上へ</a>
+
+		<h3 id="tb_opt">トラックバックへの対応設定</h3>
 		<table class="form-table">
 			<tr valign="top">
 				<th scope="row">上記設定をトラックバック記事にも採用する</th>
@@ -809,7 +823,9 @@ function addIpAddresses(newAddressStr) {
 				</td>
 			</tr>
 		</table>
-		<h3>投稿IPアドレスによる制御設定</h3>
+				<a href="#option_setting" class="alignright">▲ 上へ</a>
+
+		<h3 id="ip_opt">投稿IPアドレスによる制御設定</h3>
 		<table class="form-table">
 			<tr valign="top">
 				<th scope="row">SPAMブラックリスト利用</th>
@@ -872,7 +888,9 @@ function addIpAddresses(newAddressStr) {
 					size="80"
 					value="<?php echo get_option( 'tsa_block_ip_address_error_message', $default_block_ip_address_error_msg);?>" /><br />（初期設定：<?php echo $default_block_ip_address_error_msg; ?>）</td>
 			</tr>
-			<tr style="background-color: #fefefe;"><td colspan="2">※上記のスパムチェックから除外するIPアドレスがあれば下記に設定してください。優先的に通過させます。<br />※トラックバックは優先通過ではありません。</td></tr>
+		</table>
+			<p>※上記のスパムチェックから除外するIPアドレスがあれば下記に設定してください。優先的に通過させます。<br />※トラックバックは優先通過ではありません。</p>
+		<table class="form-table">
 			<tr style="background-color: #fefefe;" valign="top">
 				<th scope="row"><strong>IP制御免除<br />ホワイトリスト</strong></th>
 				<td>
@@ -883,7 +901,9 @@ function addIpAddresses(newAddressStr) {
 			</tr>
 
 		</table>
-		<h3>メモ（スパム対策情報や IPアドレス・NGワードその他メモ備忘録としてご自由にお使い下さい）</h3>
+				<a href="#option_setting" class="alignright">▲ 上へ</a>
+
+		<h3 id="memo_opt">メモ（スパム対策情報や IPアドレス・NGワードその他メモ備忘録としてご自由にお使い下さい）</h3>
 		<p>この欄の内容が表示されることはありません。</p>
 		<table class="form-table">
 			<tr valign="top">
@@ -893,7 +913,9 @@ function addIpAddresses(newAddressStr) {
 				</td>
 			</tr>
 		</table>
-		<h3>スパムデータベース</h3>
+				<a href="#option_setting" class="alignright">▲ 上へ</a>
+
+		<h3 id="spam_data_opt">スパムデータベース</h3>
 		<table class="form-table">
 			<tr valign="top">
 				<th scope="row">スパムコメント投稿情報を保存しますか？</th>
@@ -925,11 +947,10 @@ function addIpAddresses(newAddressStr) {
 				※一度消したデータは復活出来ませんのでご注意ください。また最低７日分は保存されます。
 				</td>
 			</tr>
-			<tr valign="top">
-				<th scope="row" colspan="2">一定時間内スパム認定機能<br />○分以内に○回スパムとなったら○分間、当該IPからのコメントはスパム扱いする設定<br />
-					<b>※一定時間以内にスパム投稿された回数を測定していますので「スパムコメント情報を保存する」機能がオフの場合は機能しません。</b>
-				</th>
-			</tr>
+		</table>
+			<p>一定時間内スパム認定機能<br />○分以内に○回スパムとなったら○分間、当該IPからのコメントはスパム扱いする設定<br />
+					<b>※一定時間以内にスパム投稿された回数を測定していますので「スパムコメント情報を保存する」機能がオフの場合は機能しません。</b></p>
+		<table class="form-table">
 			<tr>
 				<th scope="row">機能設定</th>
 				<td><?php
@@ -953,6 +974,7 @@ function addIpAddresses(newAddressStr) {
 				</td>
 			</tr>
 		</table>
+		<a href="#option_setting" class="alignright">▲ 上へ</a>
 
 		<input type="hidden" name="action" value="update" /> <input
 			type="hidden" name="page_options"
@@ -1024,7 +1046,9 @@ function addIpAddresses(newAddressStr) {
 			return NULL;
 		}
 		// 最終コメント情報取得
-		$qry_str = "SELECT post_date, post_id FROM  $this->table_name WHERE ip_address = '".htmlspecialchars( $ip_address )."' ORDER BY post_date DESC LIMIT 1 ";
+		$qry_str = "SELECT A.post_date, A.post_id, B.error_type, B.author as spam_author, B.comment as spam_comment FROM  $this->table_name as A
+					INNER JOIN $this->table_name as B ON A.ip_address = B.ip_address AND A.post_date = B.post_date
+					WHERE A.ip_address = '".htmlspecialchars( $ip_address )."' ORDER BY A.post_date DESC LIMIT 1 ";
 		$results = $wpdb->get_results( $qry_str );
 		if ( count( $results ) > 0 ) {
 			return $results[0];
@@ -1084,9 +1108,9 @@ function addIpAddresses(newAddressStr) {
 		}
 
 		// ブラックIPリスト　もう一度取得
-		$block_ip_addresses_str = get_option( 'tsa_block_ip_addresses', '' );
-		$block_ip_addresses = str_replace( "\n", ',', $block_ip_addresses_str );
-		$ip_list = mb_split(  ",", $block_ip_addresses );
+//		$block_ip_addresses_str = get_option( 'tsa_block_ip_addresses', '' );
+//		$block_ip_addresses = str_replace( "\n", ',', $block_ip_addresses_str );
+//		$ip_list = mb_split(  ",", $block_ip_addresses );
 
 		if ( $_GET['settings-updated'] == 'true' ) {
 			$_saved = TRUE;
@@ -1200,152 +1224,8 @@ function addIpAddresses(newAddressStr) {
 					$p_url = WP_PLUGIN_URL.'/'.str_replace( basename( __FILE__ ), '', plugin_basename( __FILE__ ) );
 					wp_enqueue_script( 'jquery.tablesorter', $p_url.'js/jquery.tablesorter.min.js', array( 'jquery' ), FALSE );
 					wp_enqueue_style( 'jquery.tablesorter', $p_url.'images/style.css' );
-					wp_enqueue_script( 'jquery.tipTip', $p_url.'js/jquery.tipTip.js', array( 'jquery' ), FALSE );
-					wp_enqueue_style( 'jquery.tipTip', $p_url.'css/tipTip.css' );
+					wp_enqueue_style( 'thorows-spam-away-styles', $p_url.'css/tsa_data_styles.css' );
 					?>
-	<style type="text/css">
-	<!--
-	/** 変更ボタン */
-	p.submit .button-primary {
-		width: 200px;
-		height: 30px;
-		margin: 20px auto 50px 20px;
-	}
-	/** ------ lightbox風 ----- */
-	#kotak-dialog {
-	  position:absolute;
-	  top:20%;
-	  left:50%;
-	  margin:0px 0px 0px -200px;
-	  width:400px;
-	  height:auto;
-	  background-color:#fff;
-	  -webkit-box-shadow:0px 1px 2px rgba(0,0,0,0.4);
-	  -moz-box-shadow:0px 1px 2px rgba(0,0,0,0.4);
-	  box-shadow:0px 1px 2px rgba(0,0,0,0.4);
-	  z-index:1000;
-	  display:none;
-	}
-
-	#kotak-dialog *:focus {
-	  outline:none;
-	}
-
-	#kotak-dialog h3.title {
-	  background-color:#3B5998;
-	  padding:10px 15px;
-	  color:#fff;
-	  font:normal 16px Arial,Sans-Serif;
-	  margin:0px 0px 0px 0px;
-	  position:relative;
-	}
-
-	#kotak-dialog h3.title a {
-	  position:absolute;
-	  top:10px;
-	  right:15px;
-	  color:#fff;
-	  text-decoration:none;
-	  cursor:pointer;
-	}
-
-	#kotak-dialog .isi-dialog {
-	  margin:15px;
-	  font:normal 12px Arial,Sans-Serif;
-	}
-
-	#kotak-dialog .button-wrapper {
-	  padding:10px 15px 0px;
-	  border-top:1px solid #ddd;
-	  margin-top:15px;
-	}
-
-	#kotak-dialog .button-wrapper button {
-	  background-color:#FF0C39;
-	  border:none;
-	  font:bold 12px Arial,Sans-Serif;
-	  color:#fff;
-	  padding:5px 10px;
-	  -webkit-border-radius:3px;
-	  -moz-border-radius:3px;
-	  border-radius:3px;
-	  cursor:pointer;
-	}
-
-	#kotak-dialog .button-wrapper button:hover {
-	  background-color:#aaa;
-	}
-
-	#dialog-overlay {
-	  position:fixed !important;
-	  position:absolute;
-	  z-index:999;
-	  top:0px;
-	  right:0px;
-	  bottom:0px;
-	  left:0px;
-	  background-color:#000;
-	  display:none;
-	}
-
-
-	/* Iframe */
-	#iframeContainer iframe {
-	  width:100%;
-	  height:300px;
-	  border:none;
-	  background-color:#ccc;
-	  overflow:auto;
-	}
-
-	/** スクロール対象テーブルCSS */
-	#spam_list {
-		background-color: #ffffff;
-	 	border-collapse:;
-	 	font-size: 1em !important;
-	}
-	/** 全体container */
-	#spam_list_container {
-		position: relative;
-		padding-top: 26px;
-		width: 928px; /* 列幅合計＋セル間の幅(2px)の合計＋20px */
-		border: 1px solid #3377b6;
-		background-color: #ffffff;
-	}
-	/** tbody スクロール対象 */
-	#spam_list_div {
-		overflow: auto;
-		height: 600px;
-	}
-
-	#spam_list thead tr {
-		position: absolute;
-		top: 0;
-		left: 0;
-		background-color: #ffffff;
-	}
-	#spam_list thead tr th {
-		background-color: #3377b6;
-		color: #fff;
-		padding: 3px 0px;
-	}
-	#spam_list tbody tr td {
-		background-color: #efefef;
-		color: black;
-		padding: 3px 6px;
-	}
-	#spam_list tbody tr.odd td {
-		background-color:#F0F0F6;
-	}
-
-	.cols0 { width: 200px; }
-	.cols1 { width: 50px; }
-	.cols2 { width: 130px; }
-	.cols3 { width: 300px; }
-	.cols4 { width: 220px; }
-
-	-->
-	</style>
 	<script type="text/JavaScript">
 	<!--
 	jQuery(function() {
@@ -1358,26 +1238,6 @@ function addIpAddresses(newAddressStr) {
 				3: { sorter: false }
 				}
 			});
-			// tipTip
-			jQuery(".tip").tipTip({
-				activation: "hover", // hover か focus か click で起動
-				keepAlive: "true",	 // true か false true だとずっと出ている。
-				maxWidth: "auto", //ツールチップ最大幅
-				edgeOffset: 10,   //要素からのオフセット距離
-				defaultPosition: "left", // デフォルト表示位置 bottom(default) か top か left か right
-				fadeIn: 300,	   // フェードインのスピード
-				fadeOut: 500	   // フェードアウトのスピード
-			});
-			jQuery(".tip_click").tipTip({
-				activation: "click", // hover か focus か click で起動
-				keepAlive: "true",	 // true か false true だとずっと出ている。
-				maxWidth: "auto", //ツールチップ最大幅
-				edgeOffset: 10,   //要素からのオフセット距離
-				defaultPosition: "left", // デフォルト表示位置 bottom(default) か top か left か right
-				fadeIn: 300,	   // フェードインのスピード
-				fadeOut: 500	   // フェードアウトのスピード
-			});
-
 		});
 
 	function removeIpAddressOnData(ipAddressStr) {
@@ -1399,7 +1259,8 @@ function addIpAddresses(newAddressStr) {
 	}
 	-->
 	</script>
-		<p><strong>投稿内容の判定</strong>&nbsp;最新投稿内容には最近のスパムコメント内容及びエラー判定が表示されます。●にカーソルを重ねると内容が表示されます。</p>
+		<p><strong>投稿内容の判定</strong></p>
+		※最新1件のコメント内容はIPアドレスまたはエラー判定のリンク先を参照してください。
 		<div id="spam_list_container">
 			<div id="spam_list_div">
 				<table id="spam_list" class="tablesorter">
@@ -1414,7 +1275,7 @@ function addIpAddresses(newAddressStr) {
 							<th class="cols1">投稿数</th>
 							<th class="cols2">最終投稿日時</th>
 							<th class="cols3">スパムIP登録</th>
-							<th class="cols4">最新投稿内容</th>
+							<th class="cols4">エラー判定（最新）</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -1442,6 +1303,9 @@ function addIpAddresses(newAddressStr) {
 				case 'block_ip':
 					$spam_error_type_str = 'ブロック対象IPアドレス';
 					break;
+				case 'spam_champuru':
+					$spam_error_type_str = 'すぱむちゃんぷるー';
+					break;
 				case 'spam_trackback':
 					$spam_error_type_str = 'トラックバックスパム';
 					break;
@@ -1459,7 +1323,7 @@ function addIpAddresses(newAddressStr) {
 						<tr>
 							<td>
 								<b><a href="javascript:void(0);"
-										onclick="window.open('<?php echo esc_attr( $p_url ); ?>hostbyip.php?ip=<?php esc_attr_e( $spam_ip ); ?>', 'hostbyip', 'width=350,height=300,scrollbars=no,location=no,menubar=no,toolbar=no,directories=no,status=no');"><?php esc_attr_e( $spam_ip ); ?>
+										onclick="window.open('<?php echo esc_attr( $p_url ); ?>hostbyip.php?ip=<?php esc_attr_e( $spam_ip ); ?>', 'hostbyip', 'width=350,height=500,scrollbars=no,location=no,menubar=no,toolbar=no,directories=no,status=no');"><?php esc_attr_e( $spam_ip ); ?>
 								</a></b><br clear="all" />
 								<input type="button"
 								onclick="javascript:removeIpAddressOnData('<?php esc_attr_e( $spam_ip ); ?>');"
@@ -1468,18 +1332,18 @@ function addIpAddresses(newAddressStr) {
 							<td><?php esc_attr_e( $spam_cnt ); ?>回</td>
 							<td><?php esc_attr_e( $last_post_date ); ?></td>
 							<td>
-							<?php if ( ! in_array( $spam_ip, $ip_list ) ) { ?>
+<?php // if ( ! in_array( $spam_ip, $ip_list ) ) { ?>
 							<input type="button"
 								onclick="javascript:addIpAddressOnData('<?php esc_attr_e( $spam_ip ); ?>');"
 								value="ブロック対象IPアドレス追加[<?php esc_attr_e( $spam_ip ); ?>]" />
-							<?php } else { ?>
+<?php /*} else { ?>
 								ブロック対象IP
-							<?php } ?>
+<?php } */ ?>
 							</td>
-							<td><?php esc_attr_e( $spam_error_type_str ); ?><?php if ( $spam_author != NULL && $spam_comment != NULL ) {
-							?>
-							&nbsp;<a href="javascript:void(0);" id="<?php esc_attr_e( $spam_ip ); ?>" class="tip tip_click"  title="名前：<?php echo esc_attr( $spam_author ).'<br />'; ?> 内容：<?php esc_attr_e( $spam_comment ); ?>">●</a><?php
-							} ?>
+							<td>
+								<a href="javascript:void(0);"
+										onclick="window.open('<?php echo esc_attr( $p_url ); ?>hostbyip.php?ip=<?php esc_attr_e( $spam_ip ); ?>', 'hostbyip', 'width=350,height=500,scrollbars=no,location=no,menubar=no,toolbar=no,directories=no,status=no');"><?php esc_attr_e( $spam_error_type_str ); ?>
+								</a>
 							</td>
 						</tr>
 	<?php
