@@ -1,0 +1,141 @@
+@CHARSET "UTF-8";
+/** Throws SPAM Away */
+	/** 変更ボタン */
+	p.submit .button-primary {
+		width: 200px;
+		height: 30px;
+		margin: 20px auto 50px 20px;
+	}
+	/** ------ lightbox風 ----- */
+	#kotak-dialog {
+	  position:absolute;
+	  top:20%;
+	  left:50%;
+	  margin:0px 0px 0px -200px;
+	  width:400px;
+	  height:auto;
+	  background-color:#fff;
+	  -webkit-box-shadow:0px 1px 2px rgba(0,0,0,0.4);
+	  -moz-box-shadow:0px 1px 2px rgba(0,0,0,0.4);
+	  box-shadow:0px 1px 2px rgba(0,0,0,0.4);
+	  z-index:1000;
+	  display:none;
+	}
+
+	#kotak-dialog *:focus {
+	  outline:none;
+	}
+
+	#kotak-dialog h3.title {
+	  background-color:#3B5998;
+	  padding:10px 15px;
+	  color:#fff;
+	  font:normal 16px Arial,Sans-Serif;
+	  margin:0px 0px 0px 0px;
+	  position:relative;
+	}
+
+	#kotak-dialog h3.title a {
+	  position:absolute;
+	  top:10px;
+	  right:15px;
+	  color:#fff;
+	  text-decoration:none;
+	  cursor:pointer;
+	}
+
+	#kotak-dialog .isi-dialog {
+	  margin:15px;
+	  font:normal 12px Arial,Sans-Serif;
+	}
+
+	#kotak-dialog .button-wrapper {
+	  padding:10px 15px 0px;
+	  border-top:1px solid #ddd;
+	  margin-top:15px;
+	}
+
+	#kotak-dialog .button-wrapper button {
+	  background-color:#FF0C39;
+	  border:none;
+	  font:bold 12px Arial,Sans-Serif;
+	  color:#fff;
+	  padding:5px 10px;
+	  -webkit-border-radius:3px;
+	  -moz-border-radius:3px;
+	  border-radius:3px;
+	  cursor:pointer;
+	}
+
+	#kotak-dialog .button-wrapper button:hover {
+	  background-color:#aaa;
+	}
+
+	#dialog-overlay {
+	  position:fixed !important;
+	  position:absolute;
+	  z-index:999;
+	  top:0px;
+	  right:0px;
+	  bottom:0px;
+	  left:0px;
+	  background-color:#000;
+	  display:none;
+	}
+
+
+	/* Iframe */
+	#iframeContainer iframe {
+	  width:100%;
+	  height:300px;
+	  border:none;
+	  background-color:#ccc;
+	  overflow:auto;
+	}
+
+	/** スクロール対象テーブルCSS */
+	#spam_list {
+		background-color: #ffffff;
+	 	border-collapse:;
+	 	font-size: 1em !important;
+	}
+	/** 全体container */
+	#spam_list_container {
+		position: relative;
+		padding-top: 26px;
+		width: 928px; /* 列幅合計＋セル間の幅(2px)の合計＋20px */
+		border: 1px solid #3377b6;
+		background-color: #ffffff;
+	}
+	/** tbody スクロール対象 */
+	#spam_list_div {
+		overflow: auto;
+		height: 600px;
+	}
+
+	#spam_list thead tr {
+		position: absolute;
+		top: 0;
+		left: 0;
+		background-color: #ffffff;
+	}
+	#spam_list thead tr th {
+		background-color: #3377b6;
+		color: #fff;
+		padding: 3px 0px;
+	}
+	#spam_list tbody tr td {
+		background-color: #efefef;
+		color: black;
+		padding: 3px 6px;
+	}
+	#spam_list tbody tr.odd td {
+		background-color:#F0F0F6;
+	}
+
+	.cols0 { width: 200px; }
+	.cols1 { width: 50px; }
+	.cols2 { width: 130px; }
+	.cols3 { width: 300px; }
+	.cols4 { width: 220px; }
+
