@@ -4,7 +4,7 @@
  * <p>ThrowsSpamAway</p> Class
  * WordPress's Plugin
  * @author Takeshi Satoh@GTI Inc. 2014
- * @version 2.6.3
+ * @version 2.6.4
  */
 class ThrowsSpamAway {
 
@@ -186,7 +186,7 @@ class ThrowsSpamAway {
 			// アウト！
 		} else
 			// コメント検査
-		if ( $newThrowsSpamAway->validation( $comment, $author ) ) {
+		if ( $newThrowsSpamAway->validation( $comment, $author, $id ) ) {
 			return $id;
 		}
 		$error_msg = '';
@@ -357,7 +357,7 @@ class ThrowsSpamAway {
 	 * @param string $comment
 	 * @param string $author
 	 */
-	function validation( $comment, $author ) {
+	function validation( $comment, $author, $post_id = NULL ) {
 		global $newThrowsSpamAway;
 		global $error_type;
 		global $default_on_flg;	// 日本語以外を弾くかどうか初期値
@@ -379,6 +379,10 @@ class ThrowsSpamAway {
 		//$default_spam_limit_count = 2;			// ２回までは許そうか。
 		//$default_spam_limit_over_interval = 60;	// だがそれを超えたら（デフォルト３回目以降）60分はOKコメントでもスパム扱いするんでよろしく！
 		// tsa_spam_limit_flg,tsa_spam_limit_minutes,tsa_spam_limit_count,tsa_spam_limit_over_interval,tsa_spam_limit_over_interval_error_message
+
+		// タイトル文字列は文字列カウントから排除するか　1:する
+		global $default_without_title_str;
+		$tsa_without_title_str = intval( get_option( 'tsa_without_title_str', $default_without_title_str) );
 
 		// スパム情報保存フラグ
 		$tsa_spam_data_save = get_option( 'tsa_spam_data_save' );
@@ -445,17 +449,43 @@ class ThrowsSpamAway {
 				$count_flg = 0;
 				mb_regex_encoding('UTF-8');
 				$com_split = $newThrowsSpamAway->mb_str_split( $comment );
+
+				$tit_split = NULL;
+
+				// タイトル文字列が含まれている場合はそれを除く機能のためタイトル文字列リスト化
+				if ( $tsa_without_title_str == 1 && $post_id != NULL ) {
+					global $wpdb;
+					$target_post = $wpdb->get_results("SELECT * FROM $wpdb->posts WHERE ID = '".htmlspecialchars($post_id)."'");
+
+					$title = $target_post[0]->post_title;
+
+					$tit_split = $newThrowsSpamAway->mb_str_split( $title );
+
+				}
 				foreach ( $com_split as $it ) {
-					if ( preg_match('/[一-龠]+/u', $it ) ){
-						$count_flg += 1;
-					}
-					if ( preg_match('/[ァ-ヶー]+/u', $it ) ){
-						$count_flg += 1;
-					}
-					if ( preg_match('/[ぁ-ん]+/u', $it ) ){
-						$count_flg += 1;
+
+					// タイトル文字列を除く
+					if ( $tsa_without_title_str == 1 && in_array( $it, $tit_split ) ) {
+
+						// N/A
+						// カウントをアップしない（日本語ではない率が上がる）
+
+
+					} else {
+
+						if ( preg_match('/[一-龠]+/u', $it ) ){
+							$count_flg += 1;
+						}
+						if ( preg_match('/[ァ-ヶー]+/u', $it ) ){
+							$count_flg += 1;
+						}
+						if ( preg_match('/[ぁ-ん]+/u', $it ) ){
+							$count_flg += 1;
+						}
+
 					}
 				}
+
 				$flg = ( $tsa_japanese_string_min_count < $count_flg );
 				if ($flg == FALSE) {
 					$error_type = 'not_japanese';
@@ -534,6 +564,7 @@ class ThrowsSpamAway {
 	function options_page() {
 		global $wpdb; // WordPress DBアクセス
 		global $default_on_flg;
+		global $default_without_title_str;
 		global $default_dummy_param_field_flg;
 		global $default_japanese_string_min_count;
 		global $default_caution_msg;
@@ -676,9 +707,27 @@ function addIpAddresses(newAddressStr) {
 				</td>
 			</tr>
 			<tr valign="top">
-				<th scope="row">日本語文字列含有数<br />（この文字列に達していない場合無視対象となります。）
+				<th scope="row">タイトルの文字列が含まれる場合、日本語としてカウントしない<br />（日本語を無理やり入れるためにタイトルを利用する方法を排除する）</th>
+				<td><?php
+				$chk_1 = '';
+				$chk_2 = '';
+				if ( get_option( 'tsa_without_title_str', $default_without_title_str ) != '1' ) {
+					$chk_2 = ' checked="checked"';
+				} else {
+					$chk_1 = ' checked="checked"';
+				} ?>
+					<label><input type="radio" name="tsa_without_title_str" value="1"<?php esc_attr_e( $chk_1 ); ?> />&nbsp;する</label>&nbsp;
+					<label><input type="radio" name="tsa_without_title_str" value="2"<?php esc_attr_e( $chk_2 ); ?> />&nbsp;しない</label><br />
+					（初期設定：<?php echo ( $default_without_title_str == '2' ? "しない" : "する" ); ?>）
+				</td>
+			</tr>
+			<tr valign="top">
+				<th scope="row">
+					日本語文字列含有数<br />
+					（この文字列に達していない場合無視対象となります。）
 				</th>
-				<td><input type="text" name="tsa_japanese_string_min_count"
+				<td>
+					<input type="text" name="tsa_japanese_string_min_count"
 					value="<?php echo get_option( 'tsa_japanese_string_min_count', $default_japanese_string_min_count ); ?>" /><br />
 					（初期設定：<?php echo $default_japanese_string_min_count; ?>）
 				</td>
@@ -1010,7 +1059,7 @@ function addIpAddresses(newAddressStr) {
 			$tb_val['is_spam'] = TRUE;
 		} else
 			// 検査します！
-			if ( ! $newThrowsSpamAway->validation( $comment, $author ) ) {
+			if ( ! $newThrowsSpamAway->validation( $comment, $author, $post_id ) ) {
 			$tb_val['is_spam'] = TRUE;
 		} else
 			// URL検索する場合、URL包含検査 （このブログのURLを含んでない場合エラー
