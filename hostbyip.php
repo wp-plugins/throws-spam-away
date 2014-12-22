@@ -2,8 +2,8 @@
 /**
  * <p>ThrowsSpamAway</p> hostbyipページ
  * WordPress's Plugin
- * @author Takeshi Satoh@GTI Inc. 2013
- * @version 2.6.3 2014/06/06
+ * @author Takeshi Satoh@GTI Inc. 2014
+ * @version 2.6.6 2014/12/22
  */
 require_once 'throws_spam_away.class.php';
 require_once dirname( __FILE__ ).'/../../../wp-load.php';
