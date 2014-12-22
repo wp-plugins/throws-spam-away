@@ -4,7 +4,7 @@
  Plugin URI: http://gti.jp/tsa/
  Description: コメント内に日本語の記述が存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社ジーティーアイ　さとう　たけし
- Version: 2.6.4
+ Version: 2.6.6
  Author URI: http://gti.jp/
  License: GPL2
  */
@@ -31,7 +31,7 @@ require_once 'throws_spam_away.class.php';
  */
 
 // Throws SPAM Awayバージョン
-$tsa_version = '2.6.4';
+$tsa_version = '2.6.5';
 // スパムデータベースバージョン
 $tsa_db_version = 2.6;	// 2.6からデータベース変更 [error_type]追加
 
@@ -94,12 +94,21 @@ $default_tb_on_flg = '1';
 $default_tb_url_flg = '1';
 
 /** 投稿IPアドレスによる制御設定 */
-
+/** ver 2.6.5から */
 // スパムちゃんぷるーホスト
-$spam_champuru_host = 'dnsbl.spam-champuru.livedoor.com';
+//$spam_champuru_host = 'dnsbl.spam-champuru.livedoor.com';
+// すぱむちゃんぷるー代替リスト化
+$spam_champuru_hosts = array("bsb.spamlookup.net", "bsb.empty.us", "list.dsbl.org", "all.rbl.jp");
+
+$default_spam_champuru_hosts = array("bsb.spamlookup.net");
+
+// スパムブラックリスト ｂｙ テキスト
+$default_spam_champuru_by_text = "";
 
 // すぱむちゃんぷるー利用初期設定
-$default_spam_champuru_flg = '1';		// "1":する
+$default_spam_champuru_flg = '2';		// "2":しない
+
+/** /2.6.5 */
 
 // WordPressのcommentsテーブルで「spam」判定されたことがあるIPアドレスからの投稿を無視するか
 $default_ip_block_from_spam_chk_flg = '1';	// "1":する
@@ -116,10 +125,10 @@ $default_spam_data_save = '1';
 $default_spam_data_delete_flg = '1';
 
 // スパムデータ保持期間（日）
-$default_spam_keep_day_count = 30;
+$default_spam_keep_day_count = 15;	/** 30 -> 15 */
 
 // 最低保存期間（日）
-$lower_spam_keep_day_count = 7;
+$lower_spam_keep_day_count = 3;	/** 7 -> 3 */
 
 // 機能設定
 $default_spam_limit_flg = '1';
@@ -164,6 +173,10 @@ $default_spam_limit_over_interval_error_msg = '';	// そしてその際のエラ
 // URL（単純に'http'文字列のチェックのみ）文字列の許容数                                    [tsa_ok_url_count] 数値型
 // URL（単純に'http'文字列のチェックのみ）文字列許容数オーバー時に表示される文言（元の記事に戻ってくる時間の間のみ表示）
 //                                                                                          [tsa_url_count_over_error_message] 文字列型
+
+// スパムブラックリスト																		[tsa_spam_champuru_hosts] 配列型
+// スパムブラックリスト ｂｙ テキスト														[tsa_spam_chmapuru_by_text] 文字列型（カンマ区切り）
+
 
 
 
