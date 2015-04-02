@@ -4,7 +4,7 @@
  * <p>ThrowsSpamAway</p> Class
  * WordPress's Plugin
  * @author Takeshi Satoh@GTI Inc. 2014
- * @version 2.6.4
+ * @version 2.6.7
  */
 class ThrowsSpamAway {
 
@@ -13,6 +13,21 @@ class ThrowsSpamAway {
 	var $table_name = NULL;
 
 	public function __construct() {
+
+		// エラー記号
+		if ( !defined('MUST_WORD') ) {
+			define( 'MUST_WORD' ,'must_word' );
+			define( 'NG_WORD', 'ng_word' );
+			define( 'BLOCK_IP', 'block_ip' );
+			define( 'SPAM_BLACKLIST', 'spam_champuru' );
+			define( 'URL_COUNT_OVER', 'url_count_over' );
+			define( 'SPAM_LIMIT_OVER', 'spam_limit_over' );
+			define( 'DUMMY_FIELD', 'dummy_param_field' );
+
+			define( 'SPAM_TRACKBACK', 'spam_trackback' );
+			define( 'NOT_JAPANESE', 'not_japanese');
+		}
+
 		global $default_spam_data_save;
 		global $wpdb;
 		// 接頭辞（wp_）を付けてテーブル名を設定
@@ -108,8 +123,18 @@ class ThrowsSpamAway {
 	// JS読み込み部
 	function tsa_scripts_init() {
 		global $tsa_version;
+
+		$comments_open = comments_open();
+
 		// anti-spam の方法を参考に作成しました
-		if ( ! is_admin() ) {
+		if (
+				!is_admin() &&
+				!is_home() &&
+				!is_front_page() &&
+				!is_archive() &&
+				!is_search() &&
+				$comments_open
+		) {
 			wp_enqueue_script( 'throws-spam-away-script', plugins_url( '/js/tsa_params.min.js', __FILE__ ), array( 'jquery' ), $tsa_version );
 		}
 	}
@@ -122,7 +147,6 @@ class ThrowsSpamAway {
 		if ( strlen( trim( $caution_msg ) ) > 0 ) {
 			echo '<p id="throwsSpamAway">'.$caution_msg.'</p>';    // div から p タグへ変更
 		}
-		return TRUE;
 	}
 
 	function comment_form_dummy_param_field() {
@@ -135,7 +159,6 @@ class ThrowsSpamAway {
 			echo '<p class="tsa_param_field_tsa_2">post date<span class="required">*</span><input type="text" name="tsa_param_field_tsa_3" id="tsa_param_field_tsa_3" size="30" value="'.date( 'Y-m-d H:i:s' ).'" />
 	</p>';
 		}
-		return TRUE;
 	}
 
 	function comment_post( $id ) {
@@ -191,24 +214,24 @@ class ThrowsSpamAway {
 		}
 		$error_msg = '';
 		switch ( $error_type ) {
-			case 'must_word' :
+			case MUST_WORD :
 				$error_msg = get_option( 'tsa_must_key_error_message', $default_must_key_error_msg );
 				break;
-			case 'ng_word' :
+			case NG_WORD :
 				$error_msg = get_option( 'tsa_ng_key_error_message', $default_ng_key_error_msg );
 				break;
-			case 'block_ip' :
+			case BLOCK_IP :
 				$error_msg = get_option( 'tsa_block_ip_address_error_message', $default_block_ip_address_error_msg );
 				break;
-			case 'spam_champuru' :
+			case SPAM_BLACKLIST :
 				$error_msg = get_option( 'tsa_block_ip_address_error_message', $default_block_ip_address_error_msg );
-			case 'url_count_over' :
+			case URL_COUNT_OVER :
 				$error_msg = get_option( 'tsa_url_count_over_error_message', $default_url_count_over_error_msg );
 				break;
-			case 'spam_limit_over' :
+			case SPAM_LIMIT_OVER :
 				$error_msg = get_option( 'tsa_spam_limit_over_interval_error_message', $default_spam_limit_over_interval_error_msg );
 				break;
-			case 'dummy_param_field' :	// ダミーフィールドの場合は通常メッセージ
+			case DUMMY_FIELD :	// ダミーフィールドの場合は通常メッセージ
 			default :
 				$error_msg = get_option( 'tsa_error_message', $default_error_msg );
 		}
@@ -258,7 +281,7 @@ class ThrowsSpamAway {
 			foreach ( $results as $item ) {
 				if ( trim( $item->comment_author_IP ) == trim( $target_ip ) ) {
 					// ブロックしたいIP
-					$error_type = 'block_ip';
+					$error_type = BLOCK_IP;
 					return FALSE;
 				}
 			}
@@ -274,12 +297,12 @@ class ThrowsSpamAway {
 				if ( strpos( $ip, '/' ) != FALSE ) {
 					if ( $this->in_cidr( $target_ip, $ip ) ) {
 						// ブロックしたいIP
-						$error_type = 'block_ip';
+						$error_type = BLOCK_IP;
 						return FALSE;
 					}
 				} elseif ( trim( $ip ) == trim( $target_ip ) ) {
 					// ブロックしたいIP
-					$error_type = 'block_ip';
+					$error_type = BLOCK_IP;
 					return FALSE;
 				} else {
 					// セーフIP
@@ -289,45 +312,101 @@ class ThrowsSpamAway {
 		return TRUE;
 	}
 
+// 	/**
+// 	 * スパムちゃんぷるー利用ブロック
+// 	 */
+// 	function reject_spam_ip( $ip ) {
+// 		global $spam_champuru_host;
+// 		global $error_type;
+
+// 		$spam_def_ip  = '127.0.0.2';
+// 		$host	  = $spam_champuru_host;
+// 		$pattern  = '/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/';
+// 		$check_IP = trim( preg_match( $pattern, $ip ) ? $ip : $_SERVER['REMOTE_ADDR'] );
+// 		$spam	  = false;
+// 		if ( preg_match( $pattern, $check_IP ) ) {
+// 			$host = implode( '.',array_reverse( split( '\.',$check_IP ) ) ) . '.' . $host;
+// 			if ( function_exists( 'dns_get_record' ) ) {
+// 				$check_recs = dns_get_record( $host, DNS_A );
+// 				if ( isset( $check_recs[0]['ip'] ) ) $spam = ( $check_recs[0]['ip'] === $spam_def_ip );
+// 				unset( $check_recs );
+// 			} elseif ( function_exists( 'gethostbyname' ) ) {
+// 				$checked = ( gethostbyname( $host ) === $spam_def_ip );
+// 			} elseif ( class_exists( 'Net_DNS_Resolver' ) ) {
+// 				$resolver = new Net_DNS_Resolver();
+// 				$response = $resolver->query( $host, 'A' );
+// 				if ( $response ) {
+// 					foreach ( $response->answer as $rr ) {
+// 						if ( $rr->type === 'A' ) {
+// 							$spam = ( $rr->address === $spam_def_ip );
+// 							break;
+// 						}
+// 					}
+// 				}
+// 				unset( $response );
+// 				unset( $resolver );
+// 			} elseif ( function_exists( 'checkdnsrr' ) ) {
+// 				$spam = ( checkdnsrr( $host, 'A' ) === true );
+// 			}
+// 		}
+// 		if ( $spam ) {
+// 			$error_type = SPAM_BLACKLIST;
+// 			return FALSE;
+// 		}
+// 		return TRUE;
+// 	}
+
 	/**
-	 * スパムちゃんぷるー利用ブロック
+	 * スパムちゃんぷるー代替スパムブラックリスト利用ブロック
 	 */
 	function reject_spam_ip( $ip ) {
-		global $spam_champuru_host;
+
+		// スパムブラックリスト																		[tsa_spam_champuru_hosts] 配列型
+		global $default_spam_champuru_hosts;
+		// スパムブラックリスト ｂｙ テキスト														[tsa_spam_chmapuru_by_text] 文字列型（カンマ区切り）
+		global $default_spam_champuru_by_text;
+
 		global $error_type;
 
+
+		$spam_blacklist_hosts = get_option( 'tsa_spam_champuru_hosts', $default_spam_champuru_hosts );
+		$spam_blacklist_by_text = get_option( 'tsa_spam_champuru_by_text', $default_spam_champuru_by_text);
+
+		$spam_blacklist_by_text_lists = explode( ',', $spam_blacklist_by_text );
+		if ( count( $spam_blacklist_by_text_lists ) > 0 ) {
+			foreach ( $spam_blacklist_by_text_lists as $item ) {
+				$item = trim( $item );
+			}
+		}
+
+		global $default_spam_champuru_by_text;
+
+		$check_list = array_merge($spam_blacklist_hosts, $spam_blacklist_by_text_lists);
+
 		$spam_def_ip  = '127.0.0.2';
-		$host	  = $spam_champuru_host;
 		$pattern  = '/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/';
 		$check_IP = trim( preg_match( $pattern, $ip ) ? $ip : $_SERVER['REMOTE_ADDR'] );
-		$spam	  = false;
+		$spam	  = FALSE;
 		if ( preg_match( $pattern, $check_IP ) ) {
-			$host = implode( '.',array_reverse( split( '\.',$check_IP ) ) ) . '.' . $host;
-			if ( function_exists( 'dns_get_record' ) ) {
-				$check_recs = dns_get_record( $host, DNS_A );
-				if ( isset( $check_recs[0]['ip'] ) ) $spam = ( $check_recs[0]['ip'] === $spam_def_ip );
-				unset( $check_recs );
-			} elseif ( function_exists( 'gethostbyname' ) ) {
-				$checked = ( gethostbyname( $host ) === $spam_def_ip );
-			} elseif ( class_exists( 'Net_DNS_Resolver' ) ) {
-				$resolver = new Net_DNS_Resolver();
-				$response = $resolver->query( $host, 'A' );
-				if ( $response ) {
-					foreach ( $response->answer as $rr ) {
-						if ( $rr->type === 'A' ) {
-							$spam = ( $rr->address === $spam_def_ip );
-							break;
-						}
-					}
+
+			// check
+			$i = 0;
+			while($i < count($check_list)){
+				$check = $ip . $check_list[$i];
+				$check = implode( '.',array_reverse( split( '\.',$check_IP ) ) ) . '.' . $check_list[$i];
+
+				$i ++;
+
+				$result = gethostbyname($check);
+
+				if ($result != $check) {
+					$spam = TRUE;
+					break;
 				}
-				unset( $response );
-				unset( $resolver );
-			} elseif ( function_exists( 'checkdnsrr' ) ) {
-				$spam = ( checkdnsrr( $host, 'A' ) === true );
 			}
 		}
 		if ( $spam ) {
-			$error_type = 'spam_champuru';
+			$error_type = SPAM_BLACKLIST;
 			return FALSE;
 		}
 		return TRUE;
@@ -414,7 +493,7 @@ class ThrowsSpamAway {
 			$tsa_spam_limit_count = intval( get_option( 'tsa_spam_limit_count', $default_spam_limit_count ) );
 			if ( $spam_count > $tsa_spam_limit_count ) {
 				// アウト！
-				$error_type = 'spam_limit_over';
+				$error_type = SPAM_LIMIT_OVER;
 				return FALSE;
 			}
 		}
@@ -422,13 +501,13 @@ class ThrowsSpamAway {
 		$tsa_dummy_param_field_flg = get_option( 'tsa_dummy_param_field_flg', $default_dummy_param_field_flg );
 		if ( $tsa_dummy_param_field_flg == '1') {
 			if ( ! empty( $_POST['tsa_param_field_tsa_3'] ) ) { // このフィールドにリクエストパラメータが入る場合はスパム判定
-				$error_type = 'dummy_param_field';
+				$error_type = DUMMY_FIELD;
 				return FALSE;
 			}
 		}
 		// シングルバイトだけならエラー
 		if ( $tsa_on_flg != '2' && strlen( bin2hex( $comment ) ) / 2 == mb_strlen( $comment ) ) {
-			$error_type = 'not_japanese';
+			$error_type = NOT_JAPANESE;
 			return FALSE;
 		} else {
 			// 日本語文字列必須含有数
@@ -488,7 +567,7 @@ class ThrowsSpamAway {
 
 				$flg = ( $tsa_japanese_string_min_count < $count_flg );
 				if ($flg == FALSE) {
-					$error_type = 'not_japanese';
+					$error_type = NOT_JAPANESE;
 					return FALSE;
 				}
 			}
@@ -497,7 +576,7 @@ class ThrowsSpamAway {
 				$keyword_list = mb_split( ',', $tsa_ng_keywords );
 				foreach ( $keyword_list as $key ) {
 					if ( preg_match('/'.trim( $key ).'/u', $author.$comment) ) {
-						$error_type = 'ng_word';
+						$error_type = NG_WORD;
 						return FALSE;
 					}
 				}
@@ -519,7 +598,7 @@ class ThrowsSpamAway {
 			if ( $tsa_url_count_check != '2' ) {
 				if ( substr_count( strtolower( $author.$comment ), 'http') > $tsa_ok_url_count) {
 					// URL文字列（httpの数）が多いエラー
-					$error_type = 'url_count_over';
+					$error_type = URL_COUNT_OVER;
 					return FALSE;
 				}
 			}
@@ -582,6 +661,9 @@ class ThrowsSpamAway {
 		global $default_ok_url_count;
 		global $default_spam_champuru_flg;
 
+		global $default_spam_champuru_hosts;
+		global $default_spam_champuru_by_text;
+
 		global $default_spam_limit_flg;
 		global $default_spam_limit_minutes;
 		global $default_spam_limit_count;
@@ -591,6 +673,10 @@ class ThrowsSpamAway {
 		global $default_spam_data_delete_flg;
 		global $default_spam_display_day_count;
 		global $default_spam_keep_day_count;
+
+		global $lower_spam_keep_day_count;
+
+		global $spam_champuru_hosts;
 
 		// 設定完了の場合はメッセージ表示
 		$_saved = FALSE;
@@ -877,15 +963,40 @@ function addIpAddresses(newAddressStr) {
 		<h3 id="ip_opt">投稿IPアドレスによる制御設定</h3>
 		<table class="form-table">
 			<tr valign="top">
-				<th scope="row">SPAMブラックリスト利用</th>
+				<th scope="row" rowspan="3">SPAMブラックリスト利用</th>
 				<td><?php
 				$chk = '';
 				if ( get_option( 'tsa_spam_champuru_flg', $default_spam_champuru_flg) == '1' ) {
 					$chk = ' checked="checked"';
 				}
 				?>
-					<label><input type="checkbox" name="tsa_spam_champuru_flg" value='1' <?php esc_attr_e( $chk ); ?> /><a href="http://spam-champuru.livedoor.com/dnsbl/">スパムちゃんぷるーDNSBL</a>に登録されているIPアドレスからのコメントを拒否する</label><br />
+					<label><input type="checkbox" name="tsa_spam_champuru_flg" value='1' <?php esc_attr_e( $chk ); ?> />スパムブラックリストサービスに登録されているIPアドレスからのコメントを拒否する</label><br />
 					（初期設定：<?php echo ( $default_spam_champuru_flg == '2' ? "しない" : "する" ); ?>）
+				</td>
+			</tr>
+			<tr>
+				<td>
+					<h4>下記の２つのリストはマージされて利用します。※多ければ多いほどトラッフィク量が上がりますので注意してください。</h4>
+					<strong>【利用するスパムブラックリストサービス】</strong><br />
+					<ul>
+					<?php
+					$spam_hosts = get_option( 'tsa_spam_champuru_hosts', $default_spam_champuru_hosts );
+
+					foreach ( $spam_champuru_hosts as $check_host ) { ?>
+						<li><input type="checkbox" name="tsa_spam_champuru_hosts[]" value="<?php echo $check_host; ?>"<?php
+						if ( in_array( $check_host, $spam_hosts ) ) { ?> checked="checked"<?php } ?>><?php echo $check_host; ?></li>
+					<?php } ?>
+					</ul>
+				</td>
+			</tr>
+
+			<tr>
+				<td>
+					<strong>【利用するスパムブラックリストサービスをテキスト入力（カンマ区切り）】</strong><br />
+					<input type="text" name="tsa_spam_champuru_by_text"
+					size="80"
+					value="<?php echo get_option( 'tsa_spam_champuru_by_text', $default_spam_champuru_by_text );?>" /><br />（初期設定：<?php echo $default_spam_champuru_by_text; ?>）
+
 				</td>
 			</tr>
 			<tr valign="top">
@@ -984,7 +1095,7 @@ function addIpAddresses(newAddressStr) {
 				<td>
 					<input
 					type="text" name="tsa_spam_keep_day_count" size="3"
-					value="<?php echo get_option( 'tsa_spam_keep_day_count', $default_spam_keep_day_count); ?>" />日分（最低７日）（初期設定： <?php echo $default_spam_keep_day_count; ?>）<br />&nbsp;
+					value="<?php echo get_option( 'tsa_spam_keep_day_count', $default_spam_keep_day_count); ?>" />日分（最低<?php echo $lower_spam_keep_day_count; ?>日）（初期設定： <?php echo $default_spam_keep_day_count; ?>）<br />&nbsp;
 					<?php
 						$chk = '';
 						if ( get_option( 'tsa_spam_data_delete_flg', $default_spam_data_delete_flg) == '1' ) {
@@ -1027,7 +1138,7 @@ function addIpAddresses(newAddressStr) {
 
 		<input type="hidden" name="action" value="update" /> <input
 			type="hidden" name="page_options"
-			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_second,tsa_caution_message,tsa_caution_msg_point,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_must_keywords,tsa_must_key_error_message,tsa_tb_on_flg,tsa_tb_url_flg,tsa_block_ip_addresses,tsa_ip_block_from_spam_chk_flg,tsa_block_ip_address_error_message,tsa_url_count_on_flg,tsa_ok_url_count,tsa_url_count_over_error_message,tsa_spam_data_save,tsa_spam_limit_flg,tsa_spam_limit_minutes,tsa_spam_limit_count,tsa_spam_limit_over_interval,tsa_spam_limit_over_interval_error_message,tsa_spam_champuru_flg,tsa_spam_keep_day_count,tsa_spam_data_delete_flg,tsa_white_ip_addresses,tsa_dummy_param_field_flg,tsa_memo" />
+			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_second,tsa_caution_message,tsa_caution_msg_point,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_must_keywords,tsa_must_key_error_message,tsa_tb_on_flg,tsa_tb_url_flg,tsa_block_ip_addresses,tsa_ip_block_from_spam_chk_flg,tsa_block_ip_address_error_message,tsa_url_count_on_flg,tsa_ok_url_count,tsa_url_count_over_error_message,tsa_spam_data_save,tsa_spam_limit_flg,tsa_spam_limit_minutes,tsa_spam_limit_count,tsa_spam_limit_over_interval,tsa_spam_limit_over_interval_error_message,tsa_spam_champuru_flg,tsa_spam_keep_day_count,tsa_spam_data_delete_flg,tsa_white_ip_addresses,tsa_dummy_param_field_flg,tsa_memo,tsa_spam_champuru_by_text,tsa_spam_champuru_hosts" />
 		<p class="submit" id="tsa_submit_button">
 			<input type="submit" class="button-primary"
 				value="<?php _e('Save Changes') ?>" />
@@ -1073,7 +1184,7 @@ function addIpAddresses(newAddressStr) {
 		} else {
 			if ( get_option( 'tsa_spam_data_save', $default_spam_data_save ) == '1' ) {
 				$spam_contents = array();
-				$spam_contents['error_type'] = 'spam_trackback';
+				$spam_contents['error_type'] = SPAM_TRACKBACK;
 				$spam_contents['author'] = mb_strcut( strip_tags( $author ), 0, 255 );
 				$spam_contents['comment'] = mb_strcut( strip_tags( $comment ), 0, 255 );
 
@@ -1112,6 +1223,7 @@ function addIpAddresses(newAddressStr) {
 	 */
 	 function spams_list() {
 		global $wpdb;
+		global $lower_spam_keep_day_count;
 		$_saved = FALSE;
 
 		// ブラックIPリスト
@@ -1340,31 +1452,31 @@ function addIpAddresses(newAddressStr) {
 			// エラー変換
 			$spam_error_type_str = $spam_error_type;
 			switch ( $spam_error_type ) {
-				case 'not_japanese':
+				case NOT_JAPANESE:
 					$spam_error_type_str = '日本語以外';
 					break;
-				case 'must_word':
+				case MUST_WORD:
 					$spam_error_type_str = '必須キーワード無し';
 					break;
-				case 'ng_word':
+				case NG_WORD:
 					$spam_error_type_str = 'NGキーワード混入';
 					break;
-				case 'block_ip':
+				case BLOCK_IP:
 					$spam_error_type_str = 'ブロック対象IPアドレス';
 					break;
-				case 'spam_champuru':
-					$spam_error_type_str = 'すぱむちゃんぷるー';
+				case SPAM_BLACKLIST:
+					$spam_error_type_str = 'スパムブラックリスト';
 					break;
-				case 'spam_trackback':
+				case SPAM_TRACKBACK:
 					$spam_error_type_str = 'トラックバックスパム';
 					break;
-				case 'url_count_over':
+				case URL_COUNT_OVER:
 					$spam_error_type_str = 'URL文字列混入数オーバー';
 					break;
-				case 'spam_limit_over':
+				case SPAM_LIMIT_OVER:
 					$spam_error_type_str = '一定時間スパム判定エラー';
 					break;
-				case 'dummy_param_field':
+				case DUMMY_FIELD:
 					$spam_error_type_str = 'ダミー項目エラー';
 					break;
 			}

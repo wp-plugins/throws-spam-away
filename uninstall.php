@@ -47,3 +47,9 @@ delete_option('tsa_caution_msg_point');
 // ver.2.6
 delete_option('tsa_empty_param_field_flg');
 delete_option('tsa_memo');
+
+// ver.2.6.5
+delete_option('tsa_spam_champuru_hosts');
+delete_option('tsa_spam_champuru_host');	// 2.6.4まで使用
+delete_option('tsa_spam_chmapuru_by_text');
+
