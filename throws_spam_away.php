@@ -1,10 +1,10 @@
 <?php
 /*
  Plugin Name: Throws SPAM Away
- Plugin URI: http://gti.jp/tsa/
+ Plugin URI: http://gti.jp/throws-spam-away/
  Description: コメント内に日本語の記述が存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社ジーティーアイ　さとう　たけし
- Version: 2.6.6
+ Version: 2.6.7
  Author URI: http://gti.jp/
  License: GPL2
  */
@@ -31,7 +31,7 @@ require_once 'throws_spam_away.class.php';
  */
 
 // Throws SPAM Awayバージョン
-$tsa_version = '2.6.5';
+$tsa_version = '2.6.7';
 // スパムデータベースバージョン
 $tsa_db_version = 2.6;	// 2.6からデータベース変更 [error_type]追加
 
@@ -187,7 +187,7 @@ add_filter( 'preprocess_comment', array( &$newThrowsSpamAway, 'trackback_spam_aw
 // ダミーフィールド作成
 $dummy_param_field_flg = get_option( 'tsa_dummy_param_field_flg', $default_dummy_param_field_flg );
 if ( '1' == $dummy_param_field_flg ) {
-	add_action( 'init', array( &$newThrowsSpamAway, 'tsa_scripts_init' ), 9997 );
+	add_action( 'wp_head', array( &$newThrowsSpamAway, 'tsa_scripts_init' ), 9997 );
 	add_action( "comment_form", array(&$newThrowsSpamAway, "comment_form_dummy_param_field" ), 9998);
 }
 // 注意文言表示

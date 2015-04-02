@@ -1,10 +1,10 @@
 === Plugin Name ===
 Contributors: tsato
-Donate link: http://gti.jp/tsa
+Donate link: http://gti.jp/throws-spam-away
 Tags: comments, spam
 Requires at least: 3.1
 Tested up to: 4.1
-Stable tag: 2.6.6
+Stable tag: 2.6.7
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,6 +81,10 @@ IPアドレスの指定「ブロックリスト」「ホワイトリスト」共
 ※コメント投稿時のスパムコメント対応の煩わしさが原因で作ったものですのでスパム判定されたコメントを保持しておりません。
 
 -- これまでの変更点について
+・バージョン2.6.7
+　2015/4/3
+　コメント欄の無いページではスクリプトの読込みを行わないように制御を追加
+
 ・バージョン2.6.5
 　2014/12/22
 　スパムフィルタを自身で設定できるように変更しました。
@@ -248,6 +252,10 @@ e.g.
 == Screenshots ==
 
 == Changelog ==
+= 2.6.7 =
+　2015/4/3
+　コメント欄が表示されないページではスクリプトの読込みを行わないように制御を追加
+
 = 2.6.5 =
 　2014/12/22
 　スパムフィルタを自身で設定できるように変更しました。

@@ -4,7 +4,7 @@
  * <p>ThrowsSpamAway</p> Class
  * WordPress's Plugin
  * @author Takeshi Satoh@GTI Inc. 2014
- * @version 2.6.6
+ * @version 2.6.7
  */
 class ThrowsSpamAway {
 
@@ -123,8 +123,18 @@ class ThrowsSpamAway {
 	// JS読み込み部
 	function tsa_scripts_init() {
 		global $tsa_version;
+
+		$comments_open = comments_open();
+
 		// anti-spam の方法を参考に作成しました
-		if ( ! is_admin() ) {
+		if (
+				!is_admin() &&
+				!is_home() &&
+				!is_front_page() &&
+				!is_archive() &&
+				!is_search() &&
+				$comments_open
+		) {
 			wp_enqueue_script( 'throws-spam-away-script', plugins_url( '/js/tsa_params.min.js', __FILE__ ), array( 'jquery' ), $tsa_version );
 		}
 	}
@@ -383,7 +393,7 @@ class ThrowsSpamAway {
 			$i = 0;
 			while($i < count($check_list)){
 				$check = $ip . $check_list[$i];
-				$check = implode( '.',array_reverse( split( '\.',$check_IP ) ) ) . '.' . $check_list[$i];
+				$check = implode( '.',array_reverse( @split( '\.',$check_IP ) ) ) . '.' . $check_list[$i];
 
 				$i ++;
 
@@ -436,7 +446,7 @@ class ThrowsSpamAway {
 		global $default_japanese_string_min_count; // 日本語文字最小含有数
 
 		// Throws SPAM Away 起動フラグ '1':起動 "2":オフ
-		$tsa_on_flg = get_option( 'tsa_on_flg', $default_tsa_on );
+		$tsa_on_flg = get_option( 'tsa_on_flg', $default_on_flg );
 
 		// 一定時間制限チェック
 		// 一定時間内スパム認定機能<br />○分以内に○回スパムとなったら○分間、当該IPからのコメントはスパム扱いする設定+スパム情報保存
