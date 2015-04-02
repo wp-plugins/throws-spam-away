@@ -2,8 +2,8 @@
 /**
  * <p>ThrowsSpamAway</p> hostbyipページ
  * WordPress's Plugin
- * @author Takeshi Satoh@GTI Inc. 2013
- * @version 2.6.3 2014/06/06
+ * @author Takeshi Satoh@GTI Inc. 2014
+ * @version 2.6.6 2014/12/22
  */
 require_once 'throws_spam_away.class.php';
 require_once dirname( __FILE__ ).'/../../../wp-load.php';
@@ -59,7 +59,7 @@ Whois: <a href="http://whois.arin.net/rest/ip/<?php echo $spam_ip; ?>" target="_
 <div style="background: #999;color: #fff;margin:3px 0 0 0;">このIPからの最終投稿日時</div><?php echo $last_comment_date; ?><br />
 <div style="background: #999;color: #fff;margin:3px 0 0 0;">このIPからスパム投稿対象となったページ</div><a href="<?php echo $last_comment_post; ?>" target="_blank"><?php echo $last_comment_post_title; ?></a><br />
 <?php } ?>
-<h4>スパムフィルター：<?php echo ($is_spam_champuru ? "スパムちゃんぷるー存在IPアドレス" : "未検出" ); ?></h4>
+<h4>スパムフィルター：<?php echo ($is_spam_champuru ? "スパムブラックリスト存在IPアドレス" : "未検出" ); ?></h4>
 
 <div style="background: #999;color: #fff;margin:3px 0 0 0;">最新コメント内容</div>
 <div ><?php if ( $spam_author != NULL && $spam_comment != NULL ) {
