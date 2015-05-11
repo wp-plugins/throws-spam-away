@@ -1,10 +1,10 @@
 <?php
 /*
  Plugin Name: Throws SPAM Away
- Plugin URI: http://gti.jp/tsa/
+ Plugin URI: http://gti.jp/throws-spam-away/
  Description: コメント内に日本語の記述が存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社ジーティーアイ　さとう　たけし
- Version: 2.6.4
+ Version: 2.6.8
  Author URI: http://gti.jp/
  License: GPL2
  */
@@ -30,8 +30,10 @@ require_once 'throws_spam_away.class.php';
  * デフォルト設定
  */
 
+$tsa_spam_tbl_name = 'tsa_spam';
+
 // Throws SPAM Awayバージョン
-$tsa_version = '2.6.4';
+$tsa_version = '2.6.8';
 // スパムデータベースバージョン
 $tsa_db_version = 2.6;	// 2.6からデータベース変更 [error_type]追加
 
@@ -94,12 +96,21 @@ $default_tb_on_flg = '1';
 $default_tb_url_flg = '1';
 
 /** 投稿IPアドレスによる制御設定 */
-
+/** ver 2.6.5から */
 // スパムちゃんぷるーホスト
-$spam_champuru_host = 'dnsbl.spam-champuru.livedoor.com';
+//$spam_champuru_host = 'dnsbl.spam-champuru.livedoor.com';
+// すぱむちゃんぷるー代替リスト化
+$spam_champuru_hosts = array("bsb.spamlookup.net", "bsb.empty.us", "list.dsbl.org", "all.rbl.jp");
+
+$default_spam_champuru_hosts = array("bsb.spamlookup.net");
+
+// スパムブラックリスト ｂｙ テキスト
+$default_spam_champuru_by_text = "";
 
 // すぱむちゃんぷるー利用初期設定
-$default_spam_champuru_flg = '1';		// "1":する
+$default_spam_champuru_flg = '2';		// "2":しない
+
+/** /2.6.5 */
 
 // WordPressのcommentsテーブルで「spam」判定されたことがあるIPアドレスからの投稿を無視するか
 $default_ip_block_from_spam_chk_flg = '1';	// "1":する
@@ -109,23 +120,20 @@ $default_block_ip_address_error_msg = '';
 
 /** スパムデータベース */
 
-// スパムデータベース保存するか "1":保存
-$default_spam_data_save = '1';
+// スパムデータベース保存するか "0":保存しない
+$default_spam_data_save = '0';
 
 // 期間が過ぎたデータを削除するか？	"1":する
 $default_spam_data_delete_flg = '1';
 
 // スパムデータ保持期間（日）
-$default_spam_keep_day_count = 30;
+$default_spam_keep_day_count = 15;	/** 30 -> 15 */
 
 // 最低保存期間（日）
-$lower_spam_keep_day_count = 7;
-
-// 機能設定
-$default_spam_limit_flg = '1';
+$lower_spam_keep_day_count =1;
 
 // ○分以内に○回スパムとなったら○分間そのIPからのコメントははじくかの設定
-$default_spam_limit_flg = 1;	// 1:する Other:しない ※スパム情報保存がデフォルトではないのでこちらも基本はしない方向です。
+$default_spam_limit_flg = 0;	// 1:する Other:しない ※スパム情報保存がデフォルトではないのでこちらも基本はしない方向です。
 // ※スパム情報保存していないと機能しません。
 $default_spam_limit_minutes = 10;		// １０分以内に・・・
 $default_spam_limit_count = 2;			// ２回までは許そうか。
@@ -165,6 +173,10 @@ $default_spam_limit_over_interval_error_msg = '';	// そしてその際のエラ
 // URL（単純に'http'文字列のチェックのみ）文字列許容数オーバー時に表示される文言（元の記事に戻ってくる時間の間のみ表示）
 //                                                                                          [tsa_url_count_over_error_message] 文字列型
 
+// スパムブラックリスト																		[tsa_spam_champuru_hosts] 配列型
+// スパムブラックリスト ｂｙ テキスト														[tsa_spam_chmapuru_by_text] 文字列型（カンマ区切り）
+
+
 
 
 /** プロセス */
@@ -174,7 +186,7 @@ add_filter( 'preprocess_comment', array( &$newThrowsSpamAway, 'trackback_spam_aw
 // ダミーフィールド作成
 $dummy_param_field_flg = get_option( 'tsa_dummy_param_field_flg', $default_dummy_param_field_flg );
 if ( '1' == $dummy_param_field_flg ) {
-	add_action( 'init', array( &$newThrowsSpamAway, 'tsa_scripts_init' ), 9997 );
+	add_action( 'wp_head', array( &$newThrowsSpamAway, 'tsa_scripts_init' ), 9997 );
 	add_action( "comment_form", array(&$newThrowsSpamAway, "comment_form_dummy_param_field" ), 9998);
 }
 // 注意文言表示
