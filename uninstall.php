@@ -1,9 +1,6 @@
 <?php
 /*
 Throws SPAM Awayプラグインアンインストール
-2.3 追加
-2.4 追記
-2.6 追記
 */
 
 if(!defined('ABSPATH') && !defined('WP_UNINSTALL_PLUGIN')) { exit(); }
@@ -45,5 +42,16 @@ delete_option('tsa_white_ip_addresses');
 // ver.2.5.1
 delete_option('tsa_caution_msg_point');
 // ver.2.6
-delete_option('tsa_empty_param_field_flg');
+delete_option('tsa_dummy_param_field_flg');
 delete_option('tsa_memo');
+
+// ver.2.6.5
+delete_option('tsa_spam_champuru_hosts');
+delete_option('tsa_spam_champuru_host');	// 2.6.4まで使用
+delete_option('tsa_spam_champuru_by_text');
+
+// ver.2.6.8
+global $wpdb;
+$wpdb->query( "DROP TABLE IF EXISTS ".$wpdb->prefix . "tsa_spam" );
+
+
