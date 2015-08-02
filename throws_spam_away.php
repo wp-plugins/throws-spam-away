@@ -4,11 +4,11 @@
  Plugin URI: http://gti.jp/throws-spam-away/
  Description: コメント内に日本語の記述が存在しない場合はあたかも受け付けたように振る舞いながらも捨ててしまうプラグイン
  Author: 株式会社ジーティーアイ　さとう　たけし
- Version: 2.6.8
+ Version: 2.6.9
  Author URI: http://gti.jp/
  License: GPL2
  */
-/*  Copyright 2014 Takeshi Satoh (http://gti.jp/)
+/*  Copyright 2015 Takeshi Satoh (http://gti.jp/)
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2, as
@@ -33,7 +33,7 @@ require_once 'throws_spam_away.class.php';
 $tsa_spam_tbl_name = 'tsa_spam';
 
 // Throws SPAM Awayバージョン
-$tsa_version = '2.6.8';
+$tsa_version = '2.6.9';
 // スパムデータベースバージョン
 $tsa_db_version = 2.6;	// 2.6からデータベース変更 [error_type]追加
 
@@ -100,9 +100,10 @@ $default_tb_url_flg = '1';
 // スパムちゃんぷるーホスト
 //$spam_champuru_host = 'dnsbl.spam-champuru.livedoor.com';
 // すぱむちゃんぷるー代替リスト化
-$spam_champuru_hosts = array("bsb.spamlookup.net", "bsb.empty.us", "list.dsbl.org", "all.rbl.jp");
+// リスト廃止 2.6.9
+//$spam_champuru_hosts = array("bsb.spamlookup.net", "bsb.empty.us", "list.dsbl.org", "all.rbl.jp");
 
-$default_spam_champuru_hosts = array("bsb.spamlookup.net");
+//$default_spam_champuru_hosts = array("bsb.spamlookup.net");
 
 // スパムブラックリスト ｂｙ テキスト
 $default_spam_champuru_by_text = "";

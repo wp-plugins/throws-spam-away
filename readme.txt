@@ -3,8 +3,8 @@ Contributors: tsato
 Donate link: http://gti.jp/throws-spam-away
 Tags: comments, spam
 Requires at least: 3.1
-Tested up to: 4.2.2
-Stable tag: 2.6.8
+Tested up to: 4.2.3
+Stable tag: 2.6.9
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -82,6 +82,13 @@ IPアドレスの指定「ブロックリスト」「ホワイトリスト」共
 ※コメント投稿時のスパムコメント対応の煩わしさが原因で作ったものですのでスパム判定されたコメントを保持しておりません。
 
 -- これまでの変更点について
+
+・バージョン2.6.9
+　2015/7/25
+　すぱむちゃんぷるーの代替スパムフィルタが判定の不具合となる危険性がありましたので一度機能削除しました。
+　テキストでリストを記述されている場合はそのまま稼働します。
+　ダミー項目機能において一部テーマで隠しフィールドが表示されてしまう不具合報告がありましたので修正しました。
+
 ・バージョン2.6.8
 　2015/5/12
 　スパム排除が目的なのにスパムが溜まる矛盾を解決すべく「スパムデータベースへの保存」を デフォルト OFF にしました。

@@ -1,15 +1,15 @@
 /**
  * <p>ThrowsSpamAway</p> JavaScript
  * WordPress's Plugin
- * @author Takeshi Satoh@GTI Inc. 2014
+ * @author Takeshi Satoh@GTI Inc. 2015
  * @since version2.6
  *
  * -- updated --
  * 2014/05/10 debug for IE8
+ * 2015/07/25 インラインスタイルでdisplay:none指定したため hide削除
 */
 
 jQuery(function(){
-    jQuery('.tsa_param_field_tsa_2').hide();	// hide
     jQuery('.tsa_param_field_tsa_2 input#tsa_param_field_tsa_3').val( jQuery('.tsa_param_field_tsa_ input').val() );	// copy
 
     var date = new Date();

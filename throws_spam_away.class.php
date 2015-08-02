@@ -4,7 +4,7 @@
  * <p>ThrowsSpamAway</p> Class
  * WordPress's Plugin
  * @author Takeshi Satoh@GTI Inc. 2015
- * @version 2.6.8
+ * @version 2.6.9
  */
 class ThrowsSpamAway {
 
@@ -61,7 +61,8 @@ class ThrowsSpamAway {
 		global $default_caution_msg_point, $default_error_msg, $default_url_count_check_flg;
 		global $default_ok_url_count, $default_url_count_over_error_msg, $default_ng_key_error_msg;
 		global $default_must_key_error_msg, $default_tb_on_flg, $default_tb_url_flg;
-		global $default_spam_champuru_hosts, $default_spam_champuru_by_text, $default_spam_champuru_flg;
+		//global $default_spam_champuru_hosts,
+		global $default_spam_champuru_by_text, $default_spam_champuru_flg;
 		global $default_ip_block_from_spam_chk_flg, $default_block_ip_address_error_msg, $default_spam_data_save;
 		global $default_spam_data_delete_flg, $default_spam_keep_day_count, $lower_spam_keep_day_count;
 		global $default_spam_limit_flg, $default_spam_limit_minutes, $default_spam_limit_count;
@@ -83,7 +84,7 @@ class ThrowsSpamAway {
 		update_option( 'tsa_must_key_error_message', $default_must_key_error_msg );
 		update_option( 'tsa_tb_on_flg', $default_tb_on_flg );
 		update_option( 'tsa_tb_url_flg', $default_tb_url_flg );
-		update_option( 'tsa_spam_champuru_hosts', $default_spam_champuru_hosts );
+		delete_option( 'tsa_spam_champuru_hosts');
 		update_option( 'tsa_spam_champuru_by_text', $default_spam_champuru_by_text );
 		update_option( 'tsa_spam_champuru_flg', $default_spam_champuru_flg );
 		update_option( 'tsa_ip_block_from_spam_chk_flg', $default_ip_block_from_spam_chk_flg );
@@ -217,7 +218,7 @@ class ThrowsSpamAway {
 		if ( $dummy_param_field_flg == '1' ) {
 			echo '<p class="tsa_param_field_tsa_" style="display:none;">email confirm<span class="required">*</span><input type="text" name="tsa_email_param_field___" id="tsa_email_param_field___" size="30" value="" />
 	</p>';
-			echo '<p class="tsa_param_field_tsa_2">post date<span class="required">*</span><input type="text" name="tsa_param_field_tsa_3" id="tsa_param_field_tsa_3" size="30" value="'.date( 'Y-m-d H:i:s' ).'" />
+			echo '<p class="tsa_param_field_tsa_2" style="display:none;">post date<span class="required">*</span><input type="text" name="tsa_param_field_tsa_3" id="tsa_param_field_tsa_3" size="30" value="'.date( 'Y-m-d H:i:s' ).'" />
 	</p>';
 		}
 	}
@@ -379,14 +380,14 @@ class ThrowsSpamAway {
 	function reject_spam_ip( $ip ) {
 
 		// スパムブラックリスト																		[tsa_spam_champuru_hosts] 配列型
-		global $default_spam_champuru_hosts;
+//		global $default_spam_champuru_hosts;
 		// スパムブラックリスト ｂｙ テキスト														[tsa_spam_chmapuru_by_text] 文字列型（カンマ区切り）
 		global $default_spam_champuru_by_text;
 
 		global $error_type;
 
 
-		$spam_blacklist_hosts = get_option( 'tsa_spam_champuru_hosts', $default_spam_champuru_hosts );
+//		$spam_blacklist_hosts = get_option( 'tsa_spam_champuru_hosts', $default_spam_champuru_hosts );
 		$spam_blacklist_by_text = get_option( 'tsa_spam_champuru_by_text', $default_spam_champuru_by_text);
 
 		$spam_blacklist_by_text_lists = explode( ',', $spam_blacklist_by_text );
@@ -396,9 +397,13 @@ class ThrowsSpamAway {
 			}
 		}
 
+		if ( strlen( trim( $spam_blacklist_by_text ) ) == 0 || count( $spam_blacklist_by_text_lists ) == 0 ) {
+			return TRUE;
+		}
+
 		global $default_spam_champuru_by_text;
 
-		$check_list = array_merge($spam_blacklist_hosts, $spam_blacklist_by_text_lists);
+		$check_list = $spam_blacklist_by_text_lists;
 
 		$spam_def_ip  = '127.0.0.2';
 		$pattern  = '/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/';
@@ -678,7 +683,7 @@ class ThrowsSpamAway {
 		global $default_ok_url_count;
 		global $default_spam_champuru_flg;
 
-		global $default_spam_champuru_hosts;
+		//global $default_spam_champuru_hosts;
 		global $default_spam_champuru_by_text;
 
 		global $default_spam_limit_flg;
@@ -732,7 +737,7 @@ class ThrowsSpamAway {
 			update_option( 'tsa_dummy_param_field_flg', $_POST['tsa_dummy_param_field_flg'] );
 			update_option( 'tsa_memo', $_POST['tsa_memo'] );
 			update_option( 'tsa_spam_champuru_by_text', $_POST['tsa_spam_champuru_by_text'] );
-			update_option( 'tsa_spam_champuru_hosts', ( isset( $_POST['tsa_spam_champuru_hosts'] ) ? $_POST['tsa_spam_champuru_hosts'] : NULL ) );
+			//update_option( 'tsa_spam_champuru_hosts', ( isset( $_POST['tsa_spam_champuru_hosts'] ) ? $_POST['tsa_spam_champuru_hosts'] : NULL ) );
 
 			// スパムデータベース作成
 			$this->tsa_create_tbl();
@@ -1020,7 +1025,7 @@ function addIpAddresses(newAddressStr) {
 		<h3 id="ip_opt">投稿IPアドレスによる制御設定</h3>
 		<table class="form-table">
 			<tr valign="top">
-				<th scope="row" rowspan="3">SPAMブラックリスト利用</th>
+				<th scope="row" rowspan="2">SPAMブラックリスト利用</th>
 				<td><?php
 				$chk = '';
 				if ( get_option( 'tsa_spam_champuru_flg', $default_spam_champuru_flg) == '1' ) {
@@ -1033,22 +1038,8 @@ function addIpAddresses(newAddressStr) {
 			</tr>
 			<tr>
 				<td>
-					<h4>下記の２つのリストはマージされて利用します。※多ければ多いほどトラッフィク量が上がりますので注意してください。</h4>
-					<strong>【利用するスパムブラックリストサービス】</strong><br />
-					<ul>
-					<?php
-					$spam_hosts = get_option( 'tsa_spam_champuru_hosts', $default_spam_champuru_hosts );
+					<h4>※多ければ多いほどトラッフィク量が上がりますので注意してください。</h4>
 
-					foreach ( $spam_champuru_hosts as $check_host ) { ?>
-						<li><input type="checkbox" name="tsa_spam_champuru_hosts[]" value="<?php echo $check_host; ?>"<?php
-						if ( in_array( $check_host, $spam_hosts ) ) { ?> checked="checked"<?php } ?>><?php echo $check_host; ?></li>
-					<?php } ?>
-					</ul>
-				</td>
-			</tr>
-
-			<tr>
-				<td>
 					<strong>【利用するスパムブラックリストサービスをテキスト入力（カンマ区切り）】</strong><br />
 					<input type="text" name="tsa_spam_champuru_by_text"
 					size="80"
@@ -1197,7 +1188,7 @@ function addIpAddresses(newAddressStr) {
 		<?php /**
 		<input
 			type="hidden" name="page_options"
-			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_second,tsa_caution_message,tsa_caution_msg_point,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_must_keywords,tsa_must_key_error_message,tsa_tb_on_flg,tsa_tb_url_flg,tsa_block_ip_addresses,tsa_ip_block_from_spam_chk_flg,tsa_block_ip_address_error_message,tsa_url_count_on_flg,tsa_ok_url_count,tsa_url_count_over_error_message,tsa_spam_data_save,tsa_spam_limit_flg,tsa_spam_limit_minutes,tsa_spam_limit_count,tsa_spam_limit_over_interval,tsa_spam_limit_over_interval_error_message,tsa_spam_champuru_flg,tsa_spam_keep_day_count,tsa_spam_data_delete_flg,tsa_white_ip_addresses,tsa_dummy_param_field_flg,tsa_memo,tsa_spam_champuru_by_text,tsa_spam_champuru_hosts" />
+			value="tsa_on_flg,tsa_japanese_string_min_count,tsa_back_second,tsa_caution_message,tsa_caution_msg_point,tsa_error_message,tsa_ng_keywords,tsa_ng_key_error_message,tsa_must_keywords,tsa_must_key_error_message,tsa_tb_on_flg,tsa_tb_url_flg,tsa_block_ip_addresses,tsa_ip_block_from_spam_chk_flg,tsa_block_ip_address_error_message,tsa_url_count_on_flg,tsa_ok_url_count,tsa_url_count_over_error_message,tsa_spam_data_save,tsa_spam_limit_flg,tsa_spam_limit_minutes,tsa_spam_limit_count,tsa_spam_limit_over_interval,tsa_spam_limit_over_interval_error_message,tsa_spam_champuru_flg,tsa_spam_keep_day_count,tsa_spam_data_delete_flg,tsa_white_ip_addresses,tsa_dummy_param_field_flg,tsa_memo,tsa_spam_champuru_by_text" />
 		*/ ?>
 		<p class="submit" id="tsa_submit_button">
 			<input type="submit" class="button-primary"
