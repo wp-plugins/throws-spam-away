@@ -4,7 +4,7 @@ Donate link: http://gti.jp/throws-spam-away
 Tags: comments, spam
 Requires at least: 3.1
 Tested up to: 4.2.3
-Stable tag: 2.6.9
+Stable tag: 2.6.10
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -82,6 +82,8 @@ IPアドレスの指定「ブロックリスト」「ホワイトリスト」共
 ※コメント投稿時のスパムコメント対応の煩わしさが原因で作ったものですのでスパム判定されたコメントを保持しておりません。
 
 -- これまでの変更点について
+・バージョン 2.6.10
+　管理画面レイアウト崩れ修正
 
 ・バージョン2.6.9
 　2015/7/25
@@ -272,6 +274,9 @@ e.g.
 == Screenshots ==
 
 == Changelog ==
+= 2.6.10 =
+　管理画面レイアウト崩れの修正
+
 = 2.6.9 =
 　2015/8/3
 　すぱむちゃんぷるーの代替スパムフィルタが判定の不具合となる危険性がありましたので一度機能削除しました。
